@@ -11,5 +11,9 @@ public sealed record EstanciaResponseDto(
     DateTime? FechaCheckoutReal,
     decimal MontoTotal,
     string? Estado,
-    DateTime? CreatedAt
+    DateTime? CreatedAt,
+    bool EstaFuera,
+    DateTime? HoraSalidaTemporal,
+    DateTime? HoraRegresoTemporal,
+    bool? LlavesDejadas
 );

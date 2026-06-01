@@ -512,8 +512,8 @@ ALTER TABLE categoria_producto ADD mostrar_en_ventas BIT NOT NULL DEFAULT 1;
 
 GO
 
--- Nuevos campos a la tabla estancia
 
+-- Nuevos campos a la tabla estancia
 ALTER TABLE estancia ADD
     esta_fuera BIT NOT NULL DEFAULT 0,
     hora_salida_temporal DATETIME NULL,

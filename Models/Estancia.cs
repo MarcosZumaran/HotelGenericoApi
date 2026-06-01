@@ -13,6 +13,11 @@ public class Estancia
     public string? Estado { get; set; }
     public DateTime? CreatedAt { get; set; }
 
+    public bool EstaFuera { get; set; } = false;
+    public DateTime? HoraSalidaTemporal { get; set; }
+    public DateTime? HoraRegresoTemporal { get; set; }
+    public bool? LlavesDejadas { get; set; } // null = nunca salió, true=dejó, false=no dejó
+
     // Navegación
     public Reserva? Reserva { get; set; }
     public Habitacion? Habitacion { get; set; }
