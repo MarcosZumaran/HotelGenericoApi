@@ -14,6 +14,9 @@ public class Producto
     public string? UnidadMedida { get; set; }
     public string? ImagenUrl { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public bool EsAmenidad { get; set; }
+    public bool EsVendibleEnTienda { get; set; }
+    public int? StockPorHabitacion { get; set; }
 
     // Navegación
     public AfectacionIgv? AfectacionIgv { get; set; }

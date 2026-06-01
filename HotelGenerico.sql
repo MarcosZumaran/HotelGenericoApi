@@ -541,4 +541,91 @@ BEGIN
 END
 GO
 
+-- 1. Agregar columnas a la tabla producto
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('producto') AND name = 'es_amenidad')
+    ALTER TABLE producto ADD es_amenidad BIT NOT NULL DEFAULT 0;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('producto') AND name = 'es_vendible_en_tienda')
+    ALTER TABLE producto ADD es_vendible_en_tienda BIT NOT NULL DEFAULT 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('producto') AND name = 'stock_por_habitacion')
+    ALTER TABLE producto ADD stock_por_habitacion INT NULL;
+GO
+
+-- 2. Tabla stock_habitacion (inventario actual por habitación)
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'stock_habitacion')
+BEGIN
+    CREATE TABLE stock_habitacion (
+        id_stock INT PRIMARY KEY IDENTITY(1,1),
+        id_habitacion INT NOT NULL,
+        id_producto INT NOT NULL,
+        cantidad_actual INT NOT NULL,
+        CONSTRAINT uq_stock_habitacion UNIQUE (id_habitacion, id_producto),
+        CONSTRAINT fk_stock_habitacion FOREIGN KEY (id_habitacion) REFERENCES habitacion(id_habitacion),
+        CONSTRAINT fk_stock_producto FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
+    );
+END
+GO
+
+
+-- 3. Insertar productos de amenidad (jabones, champú, toallas)
+-- Primero, insertar una categoría "Amenidades" si no existe
+IF NOT EXISTS (SELECT 1 FROM categoria_producto WHERE nombre = 'Amenidades')
+    INSERT INTO categoria_producto (nombre, descripcion) VALUES ('Amenidades', 'Artículos de cortesía en la habitación');
+GO
+
+-- Insertar productos amenidad (solo si no existen por nombre)
+IF NOT EXISTS (SELECT 1 FROM producto WHERE nombre = 'Jabón de cortesía')
+    INSERT INTO producto (nombre, descripcion, precio_unitario, id_afectacion_igv, id_categoria, stock, es_amenidad, es_vendible_en_tienda, stock_por_habitacion)
+    VALUES ('Jabón de cortesía', 'Jabón pequeño para huéspedes', 0, '10', (SELECT id_categoria FROM categoria_producto WHERE nombre = 'Amenidades'), 500, 1, 0, 2);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM producto WHERE nombre = 'Champú de cortesía')
+    INSERT INTO producto (nombre, descripcion, precio_unitario, id_afectacion_igv, id_categoria, stock, es_amenidad, es_vendible_en_tienda, stock_por_habitacion)
+    VALUES ('Champú de cortesía', 'Sobre de champú', 0, '10', (SELECT id_categoria FROM categoria_producto WHERE nombre = 'Amenidades'), 500, 1, 0, 2);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM producto WHERE nombre = 'Toalla mediana')
+    INSERT INTO producto (nombre, descripcion, precio_unitario, id_afectacion_igv, id_categoria, stock, es_amenidad, es_vendible_en_tienda, stock_por_habitacion)
+    VALUES ('Toalla mediana', 'Toalla de baño', 0, '10', (SELECT id_categoria FROM categoria_producto WHERE nombre = 'Amenidades'), 100, 1, 0, 2);
+GO
+
+-- =====================================================
+-- 1. Tabla reserva_corporativa (agrupa múltiples habitaciones)
+-- =====================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'reserva_corporativa')
+BEGIN
+    CREATE TABLE reserva_corporativa (
+        id_reserva_corporativa INT PRIMARY KEY IDENTITY(1,1),
+        id_cliente_empresa INT NOT NULL,
+        fecha_inicio DATE NOT NULL,
+        fecha_fin DATE NOT NULL,
+        numero_habitaciones INT NOT NULL,
+        estado NVARCHAR(20) NOT NULL DEFAULT 'Pendiente', -- Pendiente, Confirmada, CheckInParcial, Finalizada
+        observaciones NVARCHAR(300) NULL,
+        fecha_registro DATETIME DEFAULT GETDATE(),
+        CONSTRAINT fk_reserva_corporativa_cliente FOREIGN KEY (id_cliente_empresa) REFERENCES cliente(id_cliente)
+    );
+END
+GO
+
+-- =====================================================
+-- 2. Agregar columna a estancia para vincular a reserva corporativa
+-- =====================================================
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('estancia') AND name = 'id_reserva_corporativa')
+BEGIN
+    ALTER TABLE estancia ADD id_reserva_corporativa INT NULL;
+    ALTER TABLE estancia ADD CONSTRAINT fk_estancia_reserva_corporativa
+        FOREIGN KEY (id_reserva_corporativa) REFERENCES reserva_corporativa(id_reserva_corporativa);
+END
+GO
+
+-- =====================================================
+-- 3. Índice para búsquedas rápidas
+-- =====================================================
+CREATE INDEX ix_estancia_reserva_corporativa ON estancia(id_reserva_corporativa) WHERE id_reserva_corporativa IS NOT NULL;
+GO
+
 PRINT 'Base de datos HotelDB creada con éxito.';

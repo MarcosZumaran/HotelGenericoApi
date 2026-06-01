@@ -91,7 +91,10 @@ public class ProductoService : IProductoService
             p.StockMinimo,
             p.UnidadMedida,
             p.CreatedAt,
-            p.ImagenUrl
+            p.ImagenUrl,
+            p.EsAmenidad,
+            p.EsVendibleEnTienda,
+            p.StockPorHabitacion
         );
     }
 

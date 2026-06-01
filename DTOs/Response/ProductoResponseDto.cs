@@ -12,5 +12,8 @@ public sealed record ProductoResponseDto(
     int? StockMinimo,
     string? UnidadMedida,
     DateTime? CreatedAt,
-    string? ImagenUrl
+    string? ImagenUrl,
+    bool EsAmenidad,    
+    bool EsVendibleEnTienda,
+    int? StockPorHabitacion
 );

@@ -29,6 +29,7 @@ public class HotelDbContext : DbContext
     public DbSet<Estancia> Estancias => Set<Estancia>();
     public DbSet<Huesped> Huespedes => Set<Huesped>();
     public DbSet<Producto> Productos => Set<Producto>();
+    public DbSet<StockHabitacion> StockHabitaciones => Set<StockHabitacion>();
     public DbSet<ItemEstancia> ItemsEstancia => Set<ItemEstancia>();
     public DbSet<Venta> Ventas => Set<Venta>();
     public DbSet<ItemVenta> ItemsVenta => Set<ItemVenta>();
@@ -329,6 +330,33 @@ public class HotelDbContext : DbContext
             entity.HasOne(e => e.Categoria).WithMany().HasForeignKey(e => e.IdCategoria).HasConstraintName("fk_producto_categoria");
             entity.HasIndex(e => e.CodigoSunat).HasDatabaseName("ix_producto_codigo_sunat");
             entity.Property(e => e.ImagenUrl).HasColumnName("imagen_url").HasMaxLength(255);
+            entity.Property(e => e.EsAmenidad).HasColumnName("es_amenidad");
+            entity.Property(e => e.EsVendibleEnTienda).HasColumnName("es_vendible_en_tienda");
+            entity.Property(e => e.StockPorHabitacion).HasColumnName("stock_por_habitacion");
+        });
+
+        modelBuilder.Entity<StockHabitacion>(entity =>
+        {
+            entity.ToTable("stock_habitacion");
+            entity.HasKey(e => e.IdStock);
+            entity.Property(e => e.IdStock).HasColumnName("id_stock").ValueGeneratedOnAdd();
+            entity.Property(e => e.IdHabitacion).HasColumnName("id_habitacion");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.CantidadActual).HasColumnName("cantidad_actual");
+
+            entity.HasIndex(e => new { e.IdHabitacion, e.IdProducto })
+                .IsUnique()
+                .HasDatabaseName("uq_stock_habitacion");
+
+            entity.HasOne(e => e.Habitacion)
+                .WithMany()
+                .HasForeignKey(e => e.IdHabitacion)
+                .HasConstraintName("fk_stock_habitacion_habitacion");
+
+            entity.HasOne(e => e.Producto)
+                .WithMany()
+                .HasForeignKey(e => e.IdProducto)
+                .HasConstraintName("fk_stock_habitacion_producto");
         });
 
         modelBuilder.Entity<ItemEstancia>(entity =>
