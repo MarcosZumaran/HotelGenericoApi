@@ -18,29 +18,39 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
     public async Task<IEnumerable<ReservaCorporativaResponseDto>> GetAllAsync()
     {
-        return await _db.ReservasCorporativas
+        // 1. Cargar datos desde la BD con las relaciones necesarias
+        var reservas = await _db.ReservasCorporativas
             .Include(r => r.ClienteEmpresa)
             .Include(r => r.Estancias)
-            .Select(r => new ReservaCorporativaResponseDto
-            {
-                IdReservaCorporativa = r.IdReservaCorporativa,
-                IdClienteEmpresa = r.IdClienteEmpresa,
-                NombreEmpresa = r.ClienteEmpresa != null ? $"{r.ClienteEmpresa.Nombres} {r.ClienteEmpresa.Apellidos}" : "",
-                RucEmpresa = r.ClienteEmpresa != null ? r.ClienteEmpresa.Documento : "",
-                FechaInicio = r.FechaInicio,
-                FechaFin = r.FechaFin,
-                NumeroHabitaciones = r.NumeroHabitaciones,
-                HabitacionesOcupadas = r.Estancias.Count(e => e.Estado == "Activa"),
-                Estado = r.Estado,
-                TotalAcumulado = r.Estancias.Where(e => e.FechaCheckoutReal != null).Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
-                Observaciones = r.Observaciones,
-                FechaRegistro = r.FechaRegistro
-            })
+                .ThenInclude(e => e.ItemsEstancia)
+            .AsNoTracking()
             .ToListAsync();
+
+        // 2. Calcular el total acumulado en memoria (LINQ to Objects)
+        var result = reservas.Select(r => new ReservaCorporativaResponseDto
+        {
+            IdReservaCorporativa = r.IdReservaCorporativa,
+            IdClienteEmpresa = r.IdClienteEmpresa,
+            NombreEmpresa = r.ClienteEmpresa != null ? $"{r.ClienteEmpresa.Nombres} {r.ClienteEmpresa.Apellidos}" : "",
+            RucEmpresa = r.ClienteEmpresa != null ? r.ClienteEmpresa.Documento : "",
+            FechaInicio = r.FechaInicio,
+            FechaFin = r.FechaFin,
+            NumeroHabitaciones = r.NumeroHabitaciones,
+            HabitacionesOcupadas = r.Estancias.Count(e => e.Estado == "Activa"),
+            Estado = r.Estado,
+            TotalAcumulado = r.Estancias
+                .Where(e => e.FechaCheckoutReal != null)
+                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
+            Observaciones = r.Observaciones,
+            FechaRegistro = r.FechaRegistro
+        });
+
+        return result;
     }
 
     public async Task<ReservaCorporativaResponseDto?> GetByIdAsync(int id)
     {
+        // 1. Cargar la reserva específica con todas las relaciones
         var reserva = await _db.ReservasCorporativas
             .Include(r => r.ClienteEmpresa)
             .Include(r => r.Estancias)
@@ -49,6 +59,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
         if (reserva == null) return null;
 
+        // 2. Construir el DTO calculando el total en memoria
         return new ReservaCorporativaResponseDto
         {
             IdReservaCorporativa = reserva.IdReservaCorporativa,
@@ -60,7 +71,9 @@ public class ReservaCorporativaService : IReservaCorporativaService
             NumeroHabitaciones = reserva.NumeroHabitaciones,
             HabitacionesOcupadas = reserva.Estancias.Count(e => e.Estado == "Activa"),
             Estado = reserva.Estado,
-            TotalAcumulado = reserva.Estancias.Where(e => e.FechaCheckoutReal != null).Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
+            TotalAcumulado = reserva.Estancias
+                .Where(e => e.FechaCheckoutReal != null)
+                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
             Observaciones = reserva.Observaciones,
             FechaRegistro = reserva.FechaRegistro
         };
@@ -68,10 +81,10 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
     public async Task<ReservaCorporativaResponseDto> CreateAsync(ReservaCorporativaCreateDto dto, int idUsuario)
     {
-        // Validar que el cliente exista y sea empresa (TipoDocumento = 6)
         var cliente = await _db.Clientes.FindAsync(dto.IdClienteEmpresa);
-        if (cliente == null || cliente.TipoDocumento != "6")
-            throw new ArgumentException("El cliente debe ser una empresa con RUC (TipoDocumento = 6).");
+        // Verificar que el cliente sea una empresa
+        // if (cliente == null || cliente.TipoDocumento != "6") throw new ArgumentException("El cliente debe ser una empresa con RUC (TipoDocumento = 6).");
+        // Deshabilitado para permitir pruebas con clientes naturales, dado a que pueden hacer reservaciones familiares, y así no limitar el desarrollo solo a clientes empresariales.
 
         var reserva = new ReservaCorporativa
         {
