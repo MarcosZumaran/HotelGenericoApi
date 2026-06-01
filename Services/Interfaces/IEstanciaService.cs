@@ -31,4 +31,7 @@ public interface IEstanciaService
     // Reservas
     Task<Reserva> CreateReservaAsync(ReservaCreateDto dto, int idUsuario);
     Task<bool> CancelarReservaAsync(int idReserva);
+
+    // traslado
+    Task<TrasladoResultDto> TrasladarHabitacionAsync(int estanciaId, TrasladarEstanciaDto dto, int idUsuario);
 }

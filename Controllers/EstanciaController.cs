@@ -175,6 +175,28 @@ public class EstanciaController : ControllerBase
         return Ok();
     }
 
+    /// <summary>Traslada una estancia activa a otra habitación.</summary>
+    [HttpPost("{id}/trasladar")]
+    [ProducesResponseType(typeof(TrasladoResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> TrasladarHabitacion(int id, [FromBody] TrasladarEstanciaDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        try
+        {
+            var result = await _estanciaService.TrasladarHabitacionAsync(id, dto, userId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     /// <summary>Obtiene las reservas de una habitación.</summary>
     [HttpGet("reservas/{idHabitacion}")]
     [ProducesResponseType(typeof(List<ReservaResponseDto>), StatusCodes.Status200OK)]

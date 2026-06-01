@@ -459,6 +459,161 @@ public class EstanciaService : IEstanciaService
         return true;
     }
 
+    // TRASLADO
+
+    public async Task<TrasladoResultDto> TrasladarHabitacionAsync(int estanciaId, TrasladarEstanciaDto dto, int idUsuario)
+    {
+        // 1. Obtener estancia activa
+        var estancia = await _db.Estancias
+            .Include(e => e.Habitacion)
+            .FirstOrDefaultAsync(e => e.IdEstancia == estanciaId);
+
+        if (estancia == null)
+            throw new ArgumentException("Estancia no encontrada.");
+        if (estancia.FechaCheckoutReal != null)
+            throw new InvalidOperationException("La estancia ya está finalizada, no se puede trasladar.");
+        if (estancia.Estado != "Activa")
+            throw new InvalidOperationException("La estancia no está activa.");
+
+        var habitacionOrigen = estancia.Habitacion;
+        if (habitacionOrigen == null)
+            throw new Exception("Habitación origen no encontrada.");
+
+        // 2. Validar nueva habitación
+        var nuevaHabitacion = await _db.Habitaciones
+            .Include(h => h.Estado)
+            .FirstOrDefaultAsync(h => h.IdHabitacion == dto.NuevaHabitacionId);
+        if (nuevaHabitacion == null)
+            throw new ArgumentException("Nueva habitación no encontrada.");
+        if (nuevaHabitacion.IdEstado != 1)
+            throw new InvalidOperationException($"La habitación {nuevaHabitacion.NumeroHabitacion} no está disponible.");
+
+        // Verificar que la nueva habitación no tenga estancia activa en el rango de fechas
+        var estanciaSuperpuesta = await _db.Estancias
+            .AnyAsync(e => e.IdHabitacion == dto.NuevaHabitacionId &&
+                        e.Estado == "Activa" &&
+                        e.FechaCheckin < estancia.FechaCheckoutPrevista &&
+                        e.FechaCheckoutPrevista > estancia.FechaCheckin);
+        if (estanciaSuperpuesta)
+            throw new InvalidOperationException("La nueva habitación ya está ocupada en el período de la estancia.");
+
+        // 3. Recalcular monto si el precio por noche es diferente
+        decimal montoAnterior = estancia.MontoTotal;
+        decimal nuevoMonto = montoAnterior;
+
+        if (nuevaHabitacion.PrecioNoche != habitacionOrigen.PrecioNoche)
+        {
+            // Calcular noches restantes desde hoy hasta fechaCheckoutPrevista
+            var nochesRestantes = Math.Max(1, (int)(estancia.FechaCheckoutPrevista.Date - DateTime.UtcNow.Date).TotalDays);
+            nuevoMonto = nochesRestantes * nuevaHabitacion.PrecioNoche;
+
+            // Opcional: si ya se ha pagado algo, podrías calcular diferencia, pero simplificamos: reemplazamos total.
+            estancia.MontoTotal = nuevoMonto;
+        }
+
+        decimal ajuste = nuevoMonto - montoAnterior;
+
+        // 4. Realizar el traslado en transacción
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            // Cambiar estado de habitación origen a Limpieza
+            habitacionOrigen.IdEstado = 3; // Limpieza
+            habitacionOrigen.FechaUltimoCambio = DateTime.UtcNow;
+            habitacionOrigen.UsuarioCambio = idUsuario;
+
+            _db.HistorialEstadoHabitaciones.Add(new HistorialEstadoHabitacion
+            {
+                IdHabitacion = habitacionOrigen.IdHabitacion,
+                IdEstadoAnterior = 2, // Ocupada
+                IdEstadoNuevo = 3,
+                FechaCambio = DateTime.UtcNow,
+                IdUsuario = idUsuario,
+                Observacion = $"Traslado a habitación {nuevaHabitacion.NumeroHabitacion}"
+            });
+
+            // Cambiar estado de nueva habitación a Ocupada
+            nuevaHabitacion.IdEstado = 2; // Ocupada
+            nuevaHabitacion.FechaUltimoCambio = DateTime.UtcNow;
+            nuevaHabitacion.UsuarioCambio = idUsuario;
+
+            _db.HistorialEstadoHabitaciones.Add(new HistorialEstadoHabitacion
+            {
+                IdHabitacion = nuevaHabitacion.IdHabitacion,
+                IdEstadoAnterior = 1, // Disponible
+                IdEstadoNuevo = 2,
+                FechaCambio = DateTime.UtcNow,
+                IdUsuario = idUsuario,
+                Observacion = $"Traslado desde habitación {habitacionOrigen.NumeroHabitacion}"
+            });
+
+            // Actualizar la estancia
+            estancia.IdHabitacion = nuevaHabitacion.IdHabitacion;
+            estancia.MontoTotal = nuevoMonto;
+
+            // Registrar historial de traslado
+            var historial = new HistorialTraslado
+            {
+                IdEstancia = estanciaId,
+                IdHabitacionOrigen = habitacionOrigen.IdHabitacion,
+                IdHabitacionDestino = nuevaHabitacion.IdHabitacion,
+                Motivo = dto.Motivo,
+                FechaTraslado = DateTime.UtcNow,
+                UsuarioId = idUsuario,
+                AjusteMonto = ajuste
+            };
+            _db.HistorialTraslados.Add(historial);
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            // 5. Notificar cambios vía SignalR
+            await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
+            {
+                idHabitacion = habitacionOrigen.IdHabitacion,
+                numero = habitacionOrigen.NumeroHabitacion,
+                nuevoEstado = "Limpieza"
+            });
+
+            await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
+            {
+                idHabitacion = nuevaHabitacion.IdHabitacion,
+                numero = nuevaHabitacion.NumeroHabitacion,
+                nuevoEstado = "Ocupada"
+            });
+
+            await _hubContext.Clients.All.SendAsync("EstanciaTrasladada", new
+            {
+                idEstancia = estanciaId,
+                habitacionOrigen = habitacionOrigen.NumeroHabitacion,
+                habitacionDestino = nuevaHabitacion.NumeroHabitacion,
+                ajuste = ajuste
+            });
+
+            _logger.LogInformation("Estancia {IdEstancia} trasladada de habitación {Origen} a {Destino}. Ajuste: {Ajuste}",
+                estanciaId, habitacionOrigen.NumeroHabitacion, nuevaHabitacion.NumeroHabitacion, ajuste);
+
+            return new TrasladoResultDto
+            {
+                IdEstancia = estanciaId,
+                HabitacionOrigenId = habitacionOrigen.IdHabitacion,
+                HabitacionOrigenNumero = habitacionOrigen.NumeroHabitacion,
+                HabitacionDestinoId = nuevaHabitacion.IdHabitacion,
+                HabitacionDestinoNumero = nuevaHabitacion.NumeroHabitacion,
+                MontoAnterior = montoAnterior,
+                MontoNuevo = nuevoMonto,
+                Ajuste = ajuste,
+                Motivo = dto.Motivo
+            };
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Error al trasladar estancia {IdEstancia}", estanciaId);
+            throw;
+        }
+    }
+
     // MÉTODOS PRIVADOS
     private async Task<Cliente> ResolverClienteAsync(
         string tipoDocumento, string documento, string nombres, string apellidos,
