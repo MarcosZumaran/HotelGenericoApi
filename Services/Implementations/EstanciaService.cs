@@ -15,19 +15,24 @@ public class EstanciaService : IEstanciaService
     private readonly HotelDbContext _db;
     private readonly ILogger<EstanciaService> _logger;
     private readonly IHubContext<HabitacionHub> _hubContext;
-
     private readonly IAmenidadService _amenidadService;
+    private readonly IReservaCorporativaService _reservaCorporativaService;
 
-    public EstanciaService(HotelDbContext db, ILogger<EstanciaService> logger, IHubContext<HabitacionHub> hubContext, IAmenidadService amenidadService)
+    public EstanciaService(
+        HotelDbContext db,
+        ILogger<EstanciaService> logger,
+        IHubContext<HabitacionHub> hubContext,
+        IAmenidadService amenidadService,
+        IReservaCorporativaService reservaCorporativaService)
     {
         _db = db;
         _logger = logger;
         _hubContext = hubContext;
         _amenidadService = amenidadService;
+        _reservaCorporativaService = reservaCorporativaService;
     }
 
-    // CONSULTAS
-
+    //  CONSULTAS
     public async Task<List<Estancia>> GetAllAsync()
     {
         return await _db.Estancias
@@ -88,9 +93,9 @@ public class EstanciaService : IEstanciaService
     }
 
     // OPERACIONES PRINCIPALES
-
     public async Task<Estancia> CheckinAsync(CheckinCreateDto dto, int idUsuario)
     {
+        // Validar habitación
         var habitacion = await _db.Habitaciones
             .Include(h => h.Estado)
             .FirstOrDefaultAsync(h => h.IdHabitacion == dto.IdHabitacion)
@@ -99,7 +104,19 @@ public class EstanciaService : IEstanciaService
         if (habitacion.IdEstado != 1 && habitacion.IdEstado != 5)
             throw new InvalidOperationException($"La habitación {habitacion.NumeroHabitacion} no está disponible.");
 
-        var cliente = await ResolverClienteAsync(dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos, dto.Telefono, dto.IdClienteExistente, dto.GuardarCliente);
+        // Validar cupo de reserva corporativa si aplica
+        if (dto.IdReservaCorporativa.HasValue)
+        {
+            var puedeAsignar = await _reservaCorporativaService.ValidarYAsignarHabitacionAsync(dto.IdReservaCorporativa.Value);
+            if (!puedeAsignar)
+                throw new InvalidOperationException("La reserva corporativa ya alcanzó el número máximo de habitaciones.");
+        }
+
+        // Resolver o crear cliente
+        var cliente = await ResolverClienteAsync(
+            dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos,
+            dto.Telefono, dto.IdClienteExistente, dto.GuardarCliente);
+
         var total = CalcularMontoTotal(dto.FechaCheckoutPrevista, habitacion.PrecioNoche);
 
         var estancia = new Estancia
@@ -111,6 +128,7 @@ public class EstanciaService : IEstanciaService
             FechaCheckoutPrevista = dto.FechaCheckoutPrevista,
             MontoTotal = total,
             Estado = "Activa",
+            IdReservaCorporativa = dto.IdReservaCorporativa   // 👈 vinculación
         };
 
         using var transaction = await _db.Database.BeginTransactionAsync();
@@ -119,9 +137,11 @@ public class EstanciaService : IEstanciaService
             _db.Estancias.Add(estancia);
             await _db.SaveChangesAsync();
 
+            // Cambiar estado de la habitación a Ocupada
             habitacion.IdEstado = 2;
             habitacion.FechaUltimoCambio = DateTime.UtcNow;
 
+            // Si la estancia viene de una reserva individual, marcarla como completa
             if (dto.IdReserva.HasValue)
             {
                 var reserva = await _db.Reservas.FindAsync(dto.IdReserva.Value);
@@ -132,10 +152,21 @@ public class EstanciaService : IEstanciaService
                 }
             }
 
+            // Opcional: si es la primera estancia de una corporativa, cambiar estado a "Confirmada"
+            if (dto.IdReservaCorporativa.HasValue)
+            {
+                var corporativa = await _db.ReservasCorporativas.FindAsync(dto.IdReservaCorporativa.Value);
+                if (corporativa != null && corporativa.Estado == "Pendiente")
+                {
+                    corporativa.Estado = "Confirmada";
+                }
+            }
+
             _logger.LogInformation("Check-in realizado: Estancia {Id}, Habitación {Numero}", estancia.IdEstancia, habitacion.NumeroHabitacion);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            // Notificar vía SignalR
             await _hubContext.Clients.All.SendAsync("NuevaEstancia", new
             {
                 idEstancia = estancia.IdEstancia,
@@ -144,6 +175,7 @@ public class EstanciaService : IEstanciaService
                 cliente = $"{cliente.Nombres} {cliente.Apellidos}"
             });
 
+            // Inicializar stock de amenidades
             await _amenidadService.InicializarStockHabitacionAsync(estancia.IdHabitacion);
 
             return estancia;
@@ -171,40 +203,17 @@ public class EstanciaService : IEstanciaService
         decimal totalHabitacion = estancia.MontoTotal;
         decimal totalFinal = totalHabitacion + totalConsumos;
 
-        var clienteTitular = await _db.Clientes.FindAsync(estancia.IdClienteTitular)
-            ?? throw new Exception("Cliente titular no encontrado.");
-
-        string tipoComprobante = (clienteTitular.TipoDocumento == "6") ? "01" : "03";
-        string serie = (tipoComprobante == "01") ? "F001" : "B001";
-        int correlativo = await ObtenerSiguienteCorrelativo(serie);
-        decimal igv = totalFinal * 0.18m;
-
-        var comprobante = new Comprobante
-        {
-            IdEstancia = estanciaId,
-            TipoComprobante = tipoComprobante,
-            Serie = serie,
-            Correlativo = correlativo,
-            FechaEmision = DateTime.UtcNow,
-            MontoTotal = totalFinal,
-            IgvMonto = igv,
-            ClienteDocumentoTipo = clienteTitular.TipoDocumento,
-            ClienteDocumentoNum = clienteTitular.Documento,
-            ClienteNombre = $"{clienteTitular.Nombres} {clienteTitular.Apellidos}",
-            MetodoPago = null,
-            IdEstadoSunat = 1,
-            HashXml = null
-        };
+        // Variables para el comprobante (solo si NO es corporativa)
+        int? comprobanteId = null;
 
         using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
-            _db.Comprobantes.Add(comprobante);
-            await _db.SaveChangesAsync();
-
+            // 1. Finalizar la estancia
             estancia.FechaCheckoutReal = DateTime.UtcNow;
             estancia.Estado = "Finalizada";
 
+            // 2. Cambiar estado de la habitación a Limpieza (id=3)
             if (estancia.Habitacion != null)
             {
                 estancia.Habitacion.IdEstado = 3;
@@ -221,9 +230,49 @@ public class EstanciaService : IEstanciaService
                 });
             }
 
+            // 3. Generar comprobante SOLO si NO pertenece a una reserva corporativa
+            if (!estancia.IdReservaCorporativa.HasValue)
+            {
+                var clienteTitular = await _db.Clientes.FindAsync(estancia.IdClienteTitular)
+                    ?? throw new Exception("Cliente titular no encontrado.");
+
+                string tipoComprobante = (clienteTitular.TipoDocumento == "6") ? "01" : "03";
+                string serie = (tipoComprobante == "01") ? "F001" : "B001";
+                int correlativo = await ObtenerSiguienteCorrelativo(serie);
+                decimal igv = totalFinal * 0.18m;
+
+                var comprobante = new Comprobante
+                {
+                    IdEstancia = estanciaId,
+                    TipoComprobante = tipoComprobante,
+                    Serie = serie,
+                    Correlativo = correlativo,
+                    FechaEmision = DateTime.UtcNow,
+                    MontoTotal = totalFinal,
+                    IgvMonto = igv,
+                    ClienteDocumentoTipo = clienteTitular.TipoDocumento,
+                    ClienteDocumentoNum = clienteTitular.Documento,
+                    ClienteNombre = $"{clienteTitular.Nombres} {clienteTitular.Apellidos}",
+                    MetodoPago = null,
+                    IdEstadoSunat = 1,
+                    HashXml = null
+                };
+
+                _db.Comprobantes.Add(comprobante);
+                await _db.SaveChangesAsync();
+                comprobanteId = comprobante.IdComprobante;
+                _logger.LogInformation("Comprobante {Serie}-{Correlativo} generado para estancia {Id}",
+                    serie, correlativo, estanciaId);
+            }
+            else
+            {
+                _logger.LogInformation("Estancia corporativa {Id} finalizada sin comprobante individual", estanciaId);
+            }
+
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            // 4. Notificar cambio de estado de la habitación
             await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
             {
                 idHabitacion = estancia.IdHabitacion,
@@ -231,15 +280,14 @@ public class EstanciaService : IEstanciaService
                 nuevoEstado = "Limpieza"
             });
 
-            _logger.LogInformation("Checkout realizado para estancia {Id}. Total: {Total}, Comprobante: {Serie}-{Correlativo}",
-                estanciaId, totalFinal, serie, correlativo);
+            _logger.LogInformation("Checkout realizado para estancia {Id}. Total: {Total}", estanciaId, totalFinal);
 
             return new CheckoutResultDto
             {
                 TotalHabitacion = totalHabitacion,
                 TotalConsumos = totalConsumos,
                 TotalFinal = totalFinal,
-                ComprobanteId = comprobante.IdComprobante
+                ComprobanteId = comprobanteId
             };
         }
         catch
@@ -250,7 +298,6 @@ public class EstanciaService : IEstanciaService
     }
 
     // SALIDAS TEMPORALES
-
     public async Task RegistrarSalidaTemporalAsync(int estanciaId, bool llavesDejadas)
     {
         var estancia = await _db.Estancias.FindAsync(estanciaId);
@@ -281,7 +328,6 @@ public class EstanciaService : IEstanciaService
     }
 
     // HUÉSPEDES ADICIONALES
-
     public async Task<Huesped> AgregarHuespedCompletoAsync(int estanciaId, AgregarHuespedDto dto)
     {
         var estancia = await _db.Estancias.FindAsync(estanciaId);
@@ -327,7 +373,6 @@ public class EstanciaService : IEstanciaService
     }
 
     // CONSUMOS
-
     public async Task<bool> AddConsumoAsync(int idEstancia, ItemEstancia item)
     {
         var estancia = await _db.Estancias.FindAsync(idEstancia);
@@ -373,14 +418,16 @@ public class EstanciaService : IEstanciaService
         return true;
     }
 
-    // RESERVAS
-
+    // RESERVAS INDIVIDUALES
     public async Task<Reserva> CreateReservaAsync(ReservaCreateDto dto, int idUsuario)
     {
         var habitacion = await _db.Habitaciones.FindAsync(dto.IdHabitacion)
             ?? throw new ArgumentException("Habitación no encontrada.");
 
-        var cliente = await ResolverClienteAsync(dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos, null, dto.IdClienteExistente, dto.GuardarCliente);
+        var cliente = await ResolverClienteAsync(
+            dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos,
+            null, dto.IdClienteExistente, dto.GuardarCliente);
+
         var total = CalcularMontoTotal(dto.FechaSalidaPrevista, habitacion.PrecioNoche);
 
         var reserva = new Reserva
@@ -413,8 +460,9 @@ public class EstanciaService : IEstanciaService
     }
 
     // MÉTODOS PRIVADOS
-
-    private async Task<Cliente> ResolverClienteAsync(string tipoDocumento, string documento, string nombres, string apellidos, string? telefono, int? idClienteExistente, bool guardarCliente)
+    private async Task<Cliente> ResolverClienteAsync(
+        string tipoDocumento, string documento, string nombres, string apellidos,
+        string? telefono, int? idClienteExistente, bool guardarCliente)
     {
         if (idClienteExistente.HasValue)
         {

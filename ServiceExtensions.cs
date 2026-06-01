@@ -51,6 +51,7 @@ public static class ServiceExtensions
         services.AddScoped<IValidadorEstadoService, ValidadorEstadoService>();
         services.AddScoped<ICategoriaProductoService, CategoriaProductoService>();
         services.AddScoped<IAmenidadService, AmenidadService>();
+        services.AddScoped<IReservaCorporativaService, ReservaCorporativaService>();
 
         // HttpClient tipificado para RENIEC
         services.AddHttpClient<IReniecService, ReniecService>();
