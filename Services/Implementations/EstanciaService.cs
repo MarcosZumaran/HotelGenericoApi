@@ -23,6 +23,8 @@ public class EstanciaService : IEstanciaService
         _hubContext = hubContext;
     }
 
+    // CONSULTAS
+
     public async Task<List<Estancia>> GetAllAsync()
     {
         return await _db.Estancias
@@ -40,140 +42,6 @@ public class EstanciaService : IEstanciaService
             .Include(e => e.ItemsEstancia!).ThenInclude(i => i.Producto)
             .Include(e => e.Huespedes!).ThenInclude(h => h.Cliente)
             .FirstOrDefaultAsync(e => e.IdEstancia == id);
-    }
-
-    public async Task<Estancia> CreateAsync(Estancia estancia)
-    {
-        var habitacion = await _db.Habitaciones
-            .Include(h => h.Estado)
-            .FirstOrDefaultAsync(h => h.IdHabitacion == estancia.IdHabitacion);
-
-        if (habitacion == null)
-            throw new ArgumentException("Habitación no encontrada.");
-
-        if (habitacion.IdEstado != 1 && habitacion.IdEstado != 5)
-            throw new InvalidOperationException($"La habitación {habitacion.NumeroHabitacion} no está disponible.");
-
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            _db.Estancias.Add(estancia);
-            await _db.SaveChangesAsync();
-
-            habitacion.IdEstado = 2;
-            habitacion.FechaUltimoCambio = DateTime.UtcNow;
-
-            _logger.LogInformation("Check-in realizado: Estancia {Id}, Habitación {Numero}", estancia.IdEstancia, habitacion.NumeroHabitacion);
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return estancia;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
-    public async Task<Estancia?> CheckoutAsync(int idEstancia, int idUsuario)
-    {
-        var estancia = await _db.Estancias
-            .Include(e => e.Habitacion)
-            .FirstOrDefaultAsync(e => e.IdEstancia == idEstancia);
-
-        if (estancia == null || estancia.FechaCheckoutReal != null)
-            return null;
-
-        estancia.FechaCheckoutReal = DateTime.UtcNow;
-        estancia.Estado = "Finalizada";
-
-        if (estancia.Habitacion != null)
-        {
-            estancia.Habitacion.IdEstado = 3;
-            estancia.Habitacion.FechaUltimoCambio = DateTime.UtcNow;
-            estancia.Habitacion.UsuarioCambio = idUsuario;
-
-            _db.HistorialEstadoHabitaciones.Add(new HistorialEstadoHabitacion
-            {
-                IdHabitacion = estancia.Habitacion.IdHabitacion,
-                IdEstadoAnterior = 2,
-                IdEstadoNuevo = 3,
-                FechaCambio = DateTime.UtcNow,
-                IdUsuario = idUsuario
-            });
-        }
-
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Check-out realizado: Estancia {Id}, Habitación {Numero}", idEstancia, estancia.Habitacion?.NumeroHabitacion);
-
-        // Notificar cambio de estado a Limpieza
-        await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
-        {
-            idHabitacion = estancia.Habitacion!.IdHabitacion,
-            numero = estancia.Habitacion.NumeroHabitacion,
-            nuevoEstado = "Limpieza"
-        });
-
-        return estancia;
-    }
-
-    public async Task<bool> AddHuespedAsync(int idEstancia, Huesped huesped)
-    {
-        var estancia = await _db.Estancias.FindAsync(idEstancia);
-        if (estancia == null) return false;
-
-        huesped.IdEstancia = idEstancia;
-        _db.Huespedes.Add(huesped);
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Huésped {IdCliente} añadido a estancia {IdEstancia}", huesped.IdCliente, idEstancia);
-        return true;
-    }
-
-    public async Task<bool> AddConsumoAsync(int idEstancia, ItemEstancia item)
-    {
-        var estancia = await _db.Estancias.FindAsync(idEstancia);
-        if (estancia == null) return false;
-
-        var producto = await _db.Productos.FindAsync(item.IdProducto);
-        if (producto == null) return false;
-
-        if (producto.Stock < item.Cantidad)
-            throw new InvalidOperationException($"Stock insuficiente para {producto.Nombre}");
-
-        item.IdEstancia = idEstancia;
-        item.Subtotal = item.Cantidad * item.PrecioUnitario;
-        item.FechaRegistro = DateTime.UtcNow;
-
-        // Descontar stock
-        producto.Stock -= item.Cantidad;
-
-        _db.ItemsEstancia.Add(item);
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Consumo añadido a estancia {IdEstancia}: Producto {IdProducto}, Cantidad {Cantidad}", idEstancia, item.IdProducto, item.Cantidad);
-        return true;
-    }
-
-    public async Task<bool> UpdateConsumoAsync(int idItem, int cantidad)
-    {
-        var item = await _db.ItemsEstancia.FindAsync(idItem);
-        if (item == null) return false;
-
-        item.Cantidad = cantidad;
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Consumo {IdItem} actualizado a cantidad {Cantidad}", idItem, cantidad);
-        return true;
-    }
-
-    public async Task<bool> DeleteConsumoAsync(int idItem)
-    {
-        var item = await _db.ItemsEstancia.FindAsync(idItem);
-        if (item == null) return false;
-
-        _db.ItemsEstancia.Remove(item);
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Consumo {IdItem} eliminado", idItem);
-        return true;
     }
 
     public async Task<List<ItemConsumoResponseDto>> GetConsumosAsync(int idEstancia)
@@ -215,6 +83,8 @@ public class EstanciaService : IEstanciaService
             .AsNoTracking()
             .ToListAsync();
     }
+
+    // OPERACIONES PRINCIPALES
 
     public async Task<Estancia> CheckinAsync(CheckinCreateDto dto, int idUsuario)
     {
@@ -263,7 +133,6 @@ public class EstanciaService : IEstanciaService
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            // Notificar a todos los clientes (incluyendo el idHabitacion para navegación)
             await _hubContext.Clients.All.SendAsync("NuevaEstancia", new
             {
                 idEstancia = estancia.IdEstancia,
@@ -280,6 +149,226 @@ public class EstanciaService : IEstanciaService
             throw;
         }
     }
+
+    public async Task<CheckoutResultDto> RealizarCheckoutAsync(int estanciaId, int idUsuario)
+    {
+        var estancia = await _db.Estancias
+            .Include(e => e.Habitacion)
+            .Include(e => e.ItemsEstancia)
+            .FirstOrDefaultAsync(e => e.IdEstancia == estanciaId);
+
+        if (estancia == null)
+            throw new ArgumentException("Estancia no encontrada.");
+        if (estancia.FechaCheckoutReal != null)
+            throw new InvalidOperationException("La estancia ya tiene checkout realizado.");
+
+        decimal totalConsumos = estancia.ItemsEstancia?.Sum(i => i.Subtotal) ?? 0;
+        decimal totalHabitacion = estancia.MontoTotal;
+        decimal totalFinal = totalHabitacion + totalConsumos;
+
+        var clienteTitular = await _db.Clientes.FindAsync(estancia.IdClienteTitular)
+            ?? throw new Exception("Cliente titular no encontrado.");
+
+        string tipoComprobante = (clienteTitular.TipoDocumento == "6") ? "01" : "03";
+        string serie = (tipoComprobante == "01") ? "F001" : "B001";
+        int correlativo = await ObtenerSiguienteCorrelativo(serie);
+        decimal igv = totalFinal * 0.18m;
+
+        var comprobante = new Comprobante
+        {
+            IdEstancia = estanciaId,
+            TipoComprobante = tipoComprobante,
+            Serie = serie,
+            Correlativo = correlativo,
+            FechaEmision = DateTime.UtcNow,
+            MontoTotal = totalFinal,
+            IgvMonto = igv,
+            ClienteDocumentoTipo = clienteTitular.TipoDocumento,
+            ClienteDocumentoNum = clienteTitular.Documento,
+            ClienteNombre = $"{clienteTitular.Nombres} {clienteTitular.Apellidos}",
+            MetodoPago = null,
+            IdEstadoSunat = 1,
+            HashXml = null
+        };
+
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            _db.Comprobantes.Add(comprobante);
+            await _db.SaveChangesAsync();
+
+            estancia.FechaCheckoutReal = DateTime.UtcNow;
+            estancia.Estado = "Finalizada";
+
+            if (estancia.Habitacion != null)
+            {
+                estancia.Habitacion.IdEstado = 3;
+                estancia.Habitacion.FechaUltimoCambio = DateTime.UtcNow;
+                estancia.Habitacion.UsuarioCambio = idUsuario;
+
+                _db.HistorialEstadoHabitaciones.Add(new HistorialEstadoHabitacion
+                {
+                    IdHabitacion = estancia.Habitacion.IdHabitacion,
+                    IdEstadoAnterior = 2,
+                    IdEstadoNuevo = 3,
+                    FechaCambio = DateTime.UtcNow,
+                    IdUsuario = idUsuario
+                });
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
+            {
+                idHabitacion = estancia.IdHabitacion,
+                numero = estancia.Habitacion?.NumeroHabitacion,
+                nuevoEstado = "Limpieza"
+            });
+
+            _logger.LogInformation("Checkout realizado para estancia {Id}. Total: {Total}, Comprobante: {Serie}-{Correlativo}",
+                estanciaId, totalFinal, serie, correlativo);
+
+            return new CheckoutResultDto
+            {
+                TotalHabitacion = totalHabitacion,
+                TotalConsumos = totalConsumos,
+                TotalFinal = totalFinal,
+                ComprobanteId = comprobante.IdComprobante
+            };
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    // SALIDAS TEMPORALES
+
+    public async Task RegistrarSalidaTemporalAsync(int estanciaId, bool llavesDejadas)
+    {
+        var estancia = await _db.Estancias.FindAsync(estanciaId);
+        if (estancia == null)
+            throw new ArgumentException("Estancia no encontrada.");
+        if (estancia.EstaFuera)
+            throw new InvalidOperationException("El huésped ya está marcado como fuera.");
+
+        estancia.EstaFuera = true;
+        estancia.HoraSalidaTemporal = DateTime.UtcNow;
+        estancia.LlavesDejadas = llavesDejadas;
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Salida temporal registrada para estancia {Id}, llaves dejadas: {Llaves}", estanciaId, llavesDejadas);
+    }
+
+    public async Task RegistrarRegresoAsync(int estanciaId)
+    {
+        var estancia = await _db.Estancias.FindAsync(estanciaId);
+        if (estancia == null)
+            throw new ArgumentException("Estancia no encontrada.");
+        if (!estancia.EstaFuera)
+            throw new InvalidOperationException("El huésped no estaba fuera.");
+
+        estancia.EstaFuera = false;
+        estancia.HoraRegresoTemporal = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Regreso registrado para estancia {Id}", estanciaId);
+    }
+
+    // HUÉSPEDES ADICIONALES
+
+    public async Task<Huesped> AgregarHuespedCompletoAsync(int estanciaId, AgregarHuespedDto dto)
+    {
+        var estancia = await _db.Estancias.FindAsync(estanciaId);
+        if (estancia == null)
+            throw new ArgumentException("Estancia no encontrada.");
+
+        var cliente = await _db.Clientes
+            .FirstOrDefaultAsync(c => c.TipoDocumento == dto.TipoDocumento && c.Documento == dto.Documento);
+        if (cliente == null)
+        {
+            cliente = new Cliente
+            {
+                TipoDocumento = dto.TipoDocumento,
+                Documento = dto.Documento,
+                Nombres = dto.Nombres,
+                Apellidos = dto.Apellidos,
+                Telefono = dto.Telefono,
+                Email = dto.Email,
+                Nacionalidad = "PERUANA",
+                FechaRegistro = DateTime.UtcNow
+            };
+            _db.Clientes.Add(cliente);
+            await _db.SaveChangesAsync();
+        }
+
+        var yaExiste = await _db.Huespedes
+            .AnyAsync(h => h.IdEstancia == estanciaId && h.IdCliente == cliente.IdCliente);
+        if (yaExiste)
+            throw new InvalidOperationException("El huésped ya está registrado en esta estancia.");
+
+        var huesped = new Huesped
+        {
+            IdEstancia = estanciaId,
+            IdCliente = cliente.IdCliente,
+            EsTitular = false,
+            FechaRegistro = DateTime.UtcNow
+        };
+        _db.Huespedes.Add(huesped);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Huésped {ClienteId} agregado a estancia {EstanciaId}", cliente.IdCliente, estanciaId);
+        return huesped;
+    }
+
+    // CONSUMOS
+
+    public async Task<bool> AddConsumoAsync(int idEstancia, ItemEstancia item)
+    {
+        var estancia = await _db.Estancias.FindAsync(idEstancia);
+        if (estancia == null) return false;
+
+        var producto = await _db.Productos.FindAsync(item.IdProducto);
+        if (producto == null) return false;
+
+        if (producto.Stock < item.Cantidad)
+            throw new InvalidOperationException($"Stock insuficiente para {producto.Nombre}");
+
+        item.IdEstancia = idEstancia;
+        item.Subtotal = item.Cantidad * item.PrecioUnitario;
+        item.FechaRegistro = DateTime.UtcNow;
+
+        producto.Stock -= item.Cantidad;
+
+        _db.ItemsEstancia.Add(item);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Consumo añadido a estancia {IdEstancia}: Producto {IdProducto}, Cantidad {Cantidad}", idEstancia, item.IdProducto, item.Cantidad);
+        return true;
+    }
+
+    public async Task<bool> UpdateConsumoAsync(int idItem, int cantidad)
+    {
+        var item = await _db.ItemsEstancia.FindAsync(idItem);
+        if (item == null) return false;
+
+        item.Cantidad = cantidad;
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Consumo {IdItem} actualizado a cantidad {Cantidad}", idItem, cantidad);
+        return true;
+    }
+
+    public async Task<bool> DeleteConsumoAsync(int idItem)
+    {
+        var item = await _db.ItemsEstancia.FindAsync(idItem);
+        if (item == null) return false;
+
+        _db.ItemsEstancia.Remove(item);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Consumo {IdItem} eliminado", idItem);
+        return true;
+    }
+
+    // RESERVAS
 
     public async Task<Reserva> CreateReservaAsync(ReservaCreateDto dto, int idUsuario)
     {
@@ -318,6 +407,8 @@ public class EstanciaService : IEstanciaService
         return true;
     }
 
+    // MÉTODOS PRIVADOS
+
     private async Task<Cliente> ResolverClienteAsync(string tipoDocumento, string documento, string nombres, string apellidos, string? telefono, int? idClienteExistente, bool guardarCliente)
     {
         if (idClienteExistente.HasValue)
@@ -349,189 +440,12 @@ public class EstanciaService : IEstanciaService
         return await _db.Clientes.FirstAsync(c => c.Documento == "00000000");
     }
 
-    public async Task RegistrarSalidaTemporalAsync(int estanciaId, bool llavesDejadas)
-    {
-        var estancia = await _db.Estancias.FindAsync(estanciaId);
-        if (estancia == null)
-            throw new ArgumentException("Estancia no encontrada.");
-        if (estancia.EstaFuera)
-            throw new InvalidOperationException("El huésped ya está marcado como fuera.");
-
-        estancia.EstaFuera = true;
-        estancia.HoraSalidaTemporal = DateTime.UtcNow;
-        estancia.LlavesDejadas = llavesDejadas;
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Salida temporal registrada para estancia {Id}, llaves dejadas: {Llaves}", estanciaId, llavesDejadas);
-    }
-
-    public async Task RegistrarRegresoAsync(int estanciaId)
-    {
-        var estancia = await _db.Estancias.FindAsync(estanciaId);
-        if (estancia == null)
-            throw new ArgumentException("Estancia no encontrada.");
-        if (!estancia.EstaFuera)
-            throw new InvalidOperationException("El huésped no estaba fuera.");
-
-        estancia.EstaFuera = false;
-        estancia.HoraRegresoTemporal = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
-        _logger.LogInformation("Regreso registrado para estancia {Id}", estanciaId);
-    }
-
-    public async Task<Huesped> AgregarHuespedCompletoAsync(int estanciaId, AgregarHuespedDto dto)
-    {
-        var estancia = await _db.Estancias.FindAsync(estanciaId);
-        if (estancia == null)
-            throw new ArgumentException("Estancia no encontrada.");
-
-        // Buscar o crear cliente
-        var cliente = await _db.Clientes
-            .FirstOrDefaultAsync(c => c.TipoDocumento == dto.TipoDocumento && c.Documento == dto.Documento);
-        if (cliente == null)
-        {
-            cliente = new Cliente
-            {
-                TipoDocumento = dto.TipoDocumento,
-                Documento = dto.Documento,
-                Nombres = dto.Nombres,
-                Apellidos = dto.Apellidos,
-                Telefono = dto.Telefono,
-                Email = dto.Email,
-                Nacionalidad = "PERUANA",
-                FechaRegistro = DateTime.UtcNow
-            };
-            _db.Clientes.Add(cliente);
-            await _db.SaveChangesAsync();
-        }
-
-        // Verificar si ya es acompañante
-        var yaExiste = await _db.Huespedes
-            .AnyAsync(h => h.IdEstancia == estanciaId && h.IdCliente == cliente.IdCliente);
-        if (yaExiste)
-            throw new InvalidOperationException("El huésped ya está registrado en esta estancia.");
-
-        var huesped = new Huesped
-        {
-            IdEstancia = estanciaId,
-            IdCliente = cliente.IdCliente,
-            EsTitular = false,
-            FechaRegistro = DateTime.UtcNow
-        };
-        _db.Huespedes.Add(huesped);
-        await _db.SaveChangesAsync();
-
-        _logger.LogInformation("Huésped {ClienteId} agregado a estancia {EstanciaId}", cliente.IdCliente, estanciaId);
-        return huesped;
-    }
-
-    public async Task<CheckoutResultDto> RealizarCheckoutCompletoAsync(int estanciaId, int idUsuario)
-    {
-        var estancia = await _db.Estancias
-            .Include(e => e.Habitacion)
-            .Include(e => e.ItemsEstancia)
-            .FirstOrDefaultAsync(e => e.IdEstancia == estanciaId);
-
-        if (estancia == null)
-            throw new ArgumentException("Estancia no encontrada.");
-        if (estancia.FechaCheckoutReal != null)
-            throw new InvalidOperationException("La estancia ya tiene checkout realizado.");
-
-        // Calcular total de consumos (ya están en la colección ItemsEstancia)
-        decimal totalConsumos = estancia.ItemsEstancia?.Sum(i => i.Subtotal) ?? 0;
-        decimal totalHabitacion = estancia.MontoTotal; // Este es el monto calculado al check-in (noches)
-        decimal totalFinal = totalHabitacion + totalConsumos;
-
-        // Obtener el cliente titular
-        var clienteTitular = await _db.Clientes.FindAsync(estancia.IdClienteTitular);
-        if (clienteTitular == null)
-            throw new Exception("Cliente titular no encontrado.");
-
-        // Generar comprobante (boleta o factura según si tiene RUC)
-        string tipoComprobante = (clienteTitular.TipoDocumento == "6") ? "01" : "03";
-        string serie = (tipoComprobante == "01") ? "F001" : "B001";
-        int correlativo = await ObtenerSiguienteCorrelativo(serie);
-        decimal igv = totalFinal * 0.18m;
-
-        var comprobante = new Comprobante
-        {
-            IdEstancia = estanciaId,
-            TipoComprobante = tipoComprobante,
-            Serie = serie,
-            Correlativo = correlativo,
-            FechaEmision = DateTime.UtcNow,
-            MontoTotal = totalFinal,
-            IgvMonto = igv,
-            ClienteDocumentoTipo = clienteTitular.TipoDocumento,
-            ClienteDocumentoNum = clienteTitular.Documento,
-            ClienteNombre = $"{clienteTitular.Nombres} {clienteTitular.Apellidos}",
-            MetodoPago = null, // Podrías pedir el método de pago en el frontend y pasarlo como parámetro
-            IdEstadoSunat = 1, // Pendiente
-            HashXml = null
-        };
-
-        using var transaction = await _db.Database.BeginTransactionAsync();
-        try
-        {
-            _db.Comprobantes.Add(comprobante);
-            await _db.SaveChangesAsync();
-
-            // Actualizar estancia
-            estancia.FechaCheckoutReal = DateTime.UtcNow;
-            estancia.Estado = "Finalizada";
-
-            // Cambiar estado de la habitación a Limpieza (idEstado = 3)
-            if (estancia.Habitacion != null)
-            {
-                estancia.Habitacion.IdEstado = 3;
-                estancia.Habitacion.FechaUltimoCambio = DateTime.UtcNow;
-                estancia.Habitacion.UsuarioCambio = idUsuario;
-
-                _db.HistorialEstadoHabitaciones.Add(new HistorialEstadoHabitacion
-                {
-                    IdHabitacion = estancia.Habitacion.IdHabitacion,
-                    IdEstadoAnterior = 2,
-                    IdEstadoNuevo = 3,
-                    FechaCambio = DateTime.UtcNow,
-                    IdUsuario = idUsuario
-                });
-            }
-
-            await _db.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            // Notificar vía SignalR
-            await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
-            {
-                idHabitacion = estancia.IdHabitacion,
-                numero = estancia.Habitacion?.NumeroHabitacion,
-                nuevoEstado = "Limpieza"
-            });
-
-            _logger.LogInformation("Checkout completo realizado para estancia {Id}. Total: {Total}, Comprobante: {Serie}-{Correlativo}",
-                estanciaId, totalFinal, serie, correlativo);
-
-            return new CheckoutResultDto
-            {
-                TotalHabitacion = totalHabitacion,
-                TotalConsumos = totalConsumos,
-                TotalFinal = totalFinal,
-                ComprobanteId = comprobante.IdComprobante
-            };
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-
     private static decimal CalcularMontoTotal(DateTime fechaSalida, decimal precioNoche)
     {
         var noches = Math.Max(1, (int)(fechaSalida.Date - DateTime.UtcNow.Date).TotalDays);
         return noches * precioNoche;
     }
 
-    // Método auxiliar
     private async Task<int> ObtenerSiguienteCorrelativo(string serie)
     {
         var ultimo = await _db.Comprobantes

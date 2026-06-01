@@ -288,6 +288,10 @@ public class HotelDbContext : DbContext
             entity.Property(e => e.MontoTotal).HasColumnName("monto_total").HasColumnType("decimal(10,2)");
             entity.Property(e => e.Estado).HasColumnName("estado").HasMaxLength(20).HasDefaultValue("Activa");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.EstaFuera).HasColumnName("esta_fuera");
+            entity.Property(e => e.HoraSalidaTemporal).HasColumnName("hora_salida_temporal");
+            entity.Property(e => e.HoraRegresoTemporal).HasColumnName("hora_regreso_temporal");
+            entity.Property(e => e.LlavesDejadas).HasColumnName("llaves_dejadas");
             entity.HasOne(e => e.Reserva).WithMany().HasForeignKey(e => e.IdReserva).HasConstraintName("fk_estancia_reserva");
             entity.HasOne(e => e.Habitacion).WithMany(h => h.Estancias).HasForeignKey(e => e.IdHabitacion).HasConstraintName("fk_estancia_habitacion");
             entity.HasOne(e => e.ClienteTitular).WithMany().HasForeignKey(e => e.IdClienteTitular).HasConstraintName("fk_estancia_cliente");

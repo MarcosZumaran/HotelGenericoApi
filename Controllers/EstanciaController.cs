@@ -33,7 +33,6 @@ public class EstanciaController : ControllerBase
     }
 
     /// <summary>Obtiene una estancia por su ID con detalles completos.</summary>
-    /// <param name="id">ID de la estancia.</param>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(Estancia), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -45,49 +44,90 @@ public class EstanciaController : ControllerBase
         return Ok(estancia);
     }
 
-    /// <summary>Registra un check-in creando una nueva estancia y marcando la habitación como ocupada.</summary>
-    /// <param name="estancia">Datos de la estancia.</param>
-    [HttpPost]
+    /// <summary>Realiza check-in creando una estancia y ocupando la habitación.</summary>
+    [HttpPost("checkin")]
     [ProducesResponseType(typeof(Estancia), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<Estancia>> Create([FromBody] Estancia estancia)
+    public async Task<ActionResult<Estancia>> Checkin([FromBody] CheckinCreateDto dto)
     {
-        var result = await _estanciaService.CreateAsync(estancia);
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var result = await _estanciaService.CheckinAsync(dto, userId);
         return CreatedAtAction(nameof(GetById), new { id = result.IdEstancia }, result);
     }
 
-    /// <summary>Registra el check-out de una estancia, liberando la habitación a limpieza.</summary>
-    [HttpPost("{idEstancia}/checkout")]
-    [ProducesResponseType(typeof(Estancia), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<Estancia>> Checkout(int idEstancia, [FromQuery] int? idUsuario = null)
+    /// <summary>Realiza checkout (suma consumos, genera comprobante y libera habitación).</summary>
+    [HttpPost("{id}/checkout")]
+    [ProducesResponseType(typeof(CheckoutResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Checkout(int id)
     {
-        if (!idUsuario.HasValue)
-        {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
-                return Unauthorized();
-            idUsuario = userId;
-        }
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
 
-        var result = await _estanciaService.CheckoutAsync(idEstancia, idUsuario.Value);
-        if (result == null)
-            return NotFound();
-        return Ok(result);
+        try
+        {
+            var result = await _estanciaService.RealizarCheckoutAsync(id, userId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
-    /// <summary>Añade un huésped adicional a una estancia existente.</summary>
-    /// <param name="idEstancia">ID de la estancia.</param>
-    /// <param name="huesped">Datos del huésped.</param>
-    [HttpPost("{idEstancia}/huesped")]
+    /// <summary>Registra la salida temporal de un huésped (deja la habitación pero no hace checkout).</summary>
+    [HttpPost("{id}/salida-temporal")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> AddHuesped(int idEstancia, [FromBody] Huesped huesped)
+    public async Task<IActionResult> RegistrarSalidaTemporal(int id, [FromBody] SalidaTemporalDto dto)
     {
-        var result = await _estanciaService.AddHuespedAsync(idEstancia, huesped);
-        if (!result)
-            return BadRequest();
-        return Ok();
+        try
+        {
+            await _estanciaService.RegistrarSalidaTemporalAsync(id, dto.LlavesDejadas);
+            return Ok(new { message = "Salida temporal registrada" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Registra el regreso de un huésped que estaba fuera temporalmente.</summary>
+    [HttpPost("{id}/regreso")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RegistrarRegreso(int id)
+    {
+        try
+        {
+            await _estanciaService.RegistrarRegresoAsync(id);
+            return Ok(new { message = "Regreso registrado" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Agrega un huésped adicional a una estancia (crea el cliente si no existe).</summary>
+    [HttpPost("{id}/huespedes")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> AgregarHuesped(int id, [FromBody] AgregarHuespedDto dto)
+    {
+        try
+        {
+            var huesped = await _estanciaService.AgregarHuespedCompletoAsync(id, dto);
+            return Ok(new { idHuesped = huesped.IdHuesped, message = "Huésped agregado" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     /// <summary>Registra un consumo (producto) en una estancia activa.</summary>
@@ -144,20 +184,6 @@ public class EstanciaController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Realiza check-in creando una estancia y ocupando la habitación.</summary>
-    [HttpPost("checkin")]
-    [ProducesResponseType(typeof(Estancia), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<Estancia>> Checkin([FromBody] CheckinCreateDto dto)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
-            return Unauthorized();
-
-        var result = await _estanciaService.CheckinAsync(dto, userId);
-        return CreatedAtAction(nameof(GetById), new { id = result.IdEstancia }, result);
-    }
-
     /// <summary>Crea una nueva reserva.</summary>
     [HttpPost("reserva")]
     [ProducesResponseType(typeof(Reserva), StatusCodes.Status201Created)]
@@ -170,78 +196,6 @@ public class EstanciaController : ControllerBase
 
         var result = await _estanciaService.CreateReservaAsync(dto, userId);
         return CreatedAtAction(nameof(GetById), new { id = result.IdReserva }, result);
-    }
-
-    /// <summary>Registra la salida temporal de un huésped (deja la habitación pero no hace checkout).</summary>
-    [HttpPost("{id}/salida-temporal")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RegistrarSalidaTemporal(int id, [FromBody] SalidaTemporalDto dto)
-    {
-        try
-        {
-            await _estanciaService.RegistrarSalidaTemporalAsync(id, dto.LlavesDejadas);
-            return Ok(new { message = "Salida temporal registrada" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>Registra el regreso de un huésped que estaba fuera temporalmente.</summary>
-    [HttpPost("{id}/regreso")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RegistrarRegreso(int id)
-    {
-        try
-        {
-            await _estanciaService.RegistrarRegresoAsync(id);
-            return Ok(new { message = "Regreso registrado" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>Agrega un huésped adicional a una estancia (crea el cliente si no existe).</summary>
-    [HttpPost("{id}/huespedes")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> AgregarHuesped(int id, [FromBody] AgregarHuespedDto dto)
-    {
-        try
-        {
-            var huesped = await _estanciaService.AgregarHuespedCompletoAsync(id, dto);
-            return Ok(new { idHuesped = huesped.IdHuesped, message = "Huésped agregado" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>Realiza el checkout completo (suma consumos, genera comprobante y libera habitación).</summary>
-    [HttpPost("{id}/checkout-completo")]
-    [ProducesResponseType(typeof(CheckoutResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CheckoutCompleto(int id)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
-            return Unauthorized();
-
-        try
-        {
-            var result = await _estanciaService.RealizarCheckoutCompletoAsync(id, userId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
     }
 
     /// <summary>Cancela una reserva existente.</summary>
