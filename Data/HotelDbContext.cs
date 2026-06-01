@@ -38,6 +38,9 @@ public class HotelDbContext : DbContext
     public DbSet<CierreCajaEnvio> CierresCajaEnvio => Set<CierreCajaEnvio>();
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
 
+    public DbSet<Incidente> Incidentes => Set<Incidente>();
+    public DbSet<ObjetoPerdido> ObjetosPerdidos => Set<ObjetoPerdido>();
+
     // Vistas keyless
     public DbSet<VCierreCajaDiario> VCierreCajaDiario => Set<VCierreCajaDiario>();
     public DbSet<VEstadoHabitacion> VEstadoHabitacion => Set<VEstadoHabitacion>();
@@ -488,6 +491,69 @@ public class HotelDbContext : DbContext
             entity.Property(e => e.UserAgent).HasColumnName("user_agent").HasMaxLength(500);
             entity.HasIndex(e => new { e.IpAddress, e.AttemptedAt }).HasDatabaseName("ix_login_attempt_ip_fecha");
             entity.HasIndex(e => new { e.Username, e.AttemptedAt }).HasDatabaseName("IX_login_attempt_username_at");
+        });
+
+        modelBuilder.Entity<Incidente>(entity =>
+        {
+            entity.ToTable("incidente");
+            entity.HasKey(e => e.IdIncidente);
+            entity.Property(e => e.IdIncidente).HasColumnName("id_incidente").ValueGeneratedOnAdd();
+            entity.Property(e => e.IdEstancia).HasColumnName("id_estancia");
+            entity.Property(e => e.IdHabitacion).HasColumnName("id_habitacion");
+            entity.Property(e => e.Tipo).HasColumnName("tipo").HasMaxLength(50);
+            entity.Property(e => e.Descripcion).HasColumnName("descripcion").HasMaxLength(500);
+            entity.Property(e => e.CostoEstimado).HasColumnName("costo_estimado").HasColumnType("decimal(10,2)");
+            entity.Property(e => e.CobradoAlCliente).HasColumnName("cobrado_al_cliente");
+            entity.Property(e => e.Resuelto).HasColumnName("resuelto");
+            entity.Property(e => e.FechaRegistro).HasColumnName("fecha_registro").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.ReportadoPor).HasColumnName("reportado_por");
+
+            entity.HasOne(e => e.Estancia)
+                .WithMany()
+                .HasForeignKey(e => e.IdEstancia)
+                .HasConstraintName("fk_incidente_estancia");
+
+            entity.HasOne(e => e.Habitacion)
+                .WithMany()
+                .HasForeignKey(e => e.IdHabitacion)
+                .HasConstraintName("fk_incidente_habitacion");
+
+            entity.HasOne(e => e.UsuarioReporte)
+                .WithMany()
+                .HasForeignKey(e => e.ReportadoPor)
+                .HasConstraintName("fk_incidente_usuario");
+
+            entity.HasIndex(e => new { e.IdHabitacion, e.FechaRegistro })
+                .HasDatabaseName("ix_incidente_habitacion_fecha")
+                .IsDescending(false, true);
+            entity.HasIndex(e => e.IdEstancia).HasDatabaseName("ix_incidente_estancia");
+        });
+
+        modelBuilder.Entity<ObjetoPerdido>(entity =>
+        {
+            entity.ToTable("objeto_perdido");
+            entity.HasKey(e => e.IdObjeto);
+            entity.Property(e => e.IdObjeto).HasColumnName("id_objeto").ValueGeneratedOnAdd();
+            entity.Property(e => e.IdHabitacion).HasColumnName("id_habitacion");
+            entity.Property(e => e.IdEstancia).HasColumnName("id_estancia");
+            entity.Property(e => e.Descripcion).HasColumnName("descripcion").HasMaxLength(200);
+            entity.Property(e => e.FechaHallazgo).HasColumnName("fecha_hallazgo").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.Estado).HasColumnName("estado").HasMaxLength(20).HasDefaultValue("pendiente");
+            entity.Property(e => e.EntregadoA).HasColumnName("entregado_a").HasMaxLength(100);
+            entity.Property(e => e.FechaEntregado).HasColumnName("fecha_entregado");
+
+            entity.HasOne(e => e.Habitacion)
+                .WithMany()
+                .HasForeignKey(e => e.IdHabitacion)
+                .HasConstraintName("fk_objeto_habitacion");
+
+            entity.HasOne(e => e.Estancia)
+                .WithMany()
+                .HasForeignKey(e => e.IdEstancia)
+                .HasConstraintName("fk_objeto_estancia");
+
+            entity.HasIndex(e => e.Estado).HasDatabaseName("ix_objeto_estado");
+            entity.HasIndex(e => e.FechaHallazgo).HasDatabaseName("ix_objeto_fecha").IsDescending();
         });
 
         // Vistas keyless
