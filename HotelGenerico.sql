@@ -512,4 +512,33 @@ ALTER TABLE categoria_producto ADD mostrar_en_ventas BIT NOT NULL DEFAULT 1;
 
 GO
 
-PRINT 'Base de datos HotelDB creada con éxito según el nuevo estándar.';
+-- Nuevos campos a la tabla estancia
+
+ALTER TABLE estancia ADD
+    esta_fuera BIT NOT NULL DEFAULT 0,
+    hora_salida_temporal DATETIME NULL,
+    hora_regreso_temporal DATETIME NULL,
+    llaves_dejadas BIT NULL;  -- NULL: nunca se registró salida; 1: dejó; 0: no dejó
+
+-- Tabla de parámetros globales del hotel
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'parametro_hotel')
+BEGIN
+    CREATE TABLE parametro_hotel (
+        id_parametro INT PRIMARY KEY IDENTITY(1,1),
+        clave NVARCHAR(100) UNIQUE NOT NULL,
+        valor NVARCHAR(500) NOT NULL,
+        descripcion NVARCHAR(200) NULL,
+        fecha_actualizacion DATETIME DEFAULT GETDATE()
+    );
+END
+
+-- Insertar el parámetro por defecto
+IF NOT EXISTS (SELECT 1 FROM parametro_hotel WHERE clave = 'requerir_llaves_salida_temporal')
+BEGIN
+    INSERT INTO parametro_hotel (clave, valor, descripcion)
+    VALUES ('requerir_llaves_salida_temporal', 'false',
+            'Si es true, al registrar una salida temporal se mostrará alerta si el huésped no deja las llaves');
+END
+GO
+
+PRINT 'Base de datos HotelDB creada con éxito.';
