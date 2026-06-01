@@ -667,4 +667,20 @@ GO
 CREATE INDEX ix_objeto_estado ON objeto_perdido(estado);
 CREATE INDEX ix_objeto_fecha ON objeto_perdido(fecha_hallazgo DESC);
 
+GO
+
+-- Agregar columna imagen_url a incidente
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('incidente') AND name = 'imagen_url')
+BEGIN
+    ALTER TABLE incidente ADD imagen_url NVARCHAR(255) NULL;
+END
+GO
+
+-- Agregar columna imagen_url a objeto_perdido
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('objeto_perdido') AND name = 'imagen_url')
+BEGIN
+    ALTER TABLE objeto_perdido ADD imagen_url NVARCHAR(255) NULL;
+END
+GO
+
 PRINT 'Base de datos HotelDB creada con éxito.';
