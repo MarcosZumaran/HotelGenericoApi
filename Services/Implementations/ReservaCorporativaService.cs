@@ -86,21 +86,53 @@ public class ReservaCorporativaService : IReservaCorporativaService
         // if (cliente == null || cliente.TipoDocumento != "6") throw new ArgumentException("El cliente debe ser una empresa con RUC (TipoDocumento = 6).");
         // Deshabilitado para permitir pruebas con clientes naturales, dado a que pueden hacer reservaciones familiares, y así no limitar el desarrollo solo a clientes empresariales.
 
-        var reserva = new ReservaCorporativa
+        // Crear cabecera de reserva múltiple
+        var reservaMultiple = new ReservaCorporativa
         {
             IdClienteEmpresa = dto.IdClienteEmpresa,
             FechaInicio = dto.FechaInicio,
             FechaFin = dto.FechaFin,
-            NumeroHabitaciones = dto.NumeroHabitaciones,
-            Estado = "Pendiente",
+            NumeroHabitaciones = dto.HabitacionesIds.Count,
+            Estado = "Confirmada",
             Observaciones = dto.Observaciones,
             FechaRegistro = DateTime.UtcNow
         };
 
-        _db.ReservasCorporativas.Add(reserva);
+        _db.ReservasCorporativas.Add(reservaMultiple);
         await _db.SaveChangesAsync();
 
-        return (await GetByIdAsync(reserva.IdReservaCorporativa))!;
+        // Crear una reserva individual por cada habitación
+        foreach (var habId in dto.HabitacionesIds)
+        {
+            var habitacion = await _db.Habitaciones.FindAsync(habId);
+            if (habitacion == null) continue;
+
+            var reserva = new Reserva
+            {
+                IdCliente = dto.IdClienteEmpresa,
+                IdHabitacion = habId,
+                IdUsuario = idUsuario,
+                FechaRegistro = DateTime.UtcNow,
+                FechaEntradaPrevista = dto.FechaInicio,
+                FechaSalidaPrevista = dto.FechaFin,
+                MontoTotal = CalcularMontoTotal(dto.FechaFin, habitacion.PrecioNoche), // implementar este helper
+                Estado = "Confirmada",
+                EsNoShow = false,
+                Observaciones = $"Reserva múltiple #{reservaMultiple.IdReservaCorporativa}"
+            };
+            _db.Reservas.Add(reserva);
+        }
+
+        await _db.SaveChangesAsync();
+
+        return (await GetByIdAsync(reservaMultiple.IdReservaCorporativa))!;
+    }
+
+    // Helper (puedes copiarlo de EstanciaService)
+    private decimal CalcularMontoTotal(DateTime fechaSalida, decimal precioNoche)
+    {
+        var noches = Math.Max(1, (int)(fechaSalida.Date - DateTime.UtcNow.Date).TotalDays);
+        return noches * precioNoche;
     }
 
     public async Task<bool> UpdateAsync(int id, ReservaCorporativaCreateDto dto)

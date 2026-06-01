@@ -7,4 +7,5 @@ public class ReservaCorporativaCreateDto
     public DateTime FechaFin { get; set; }
     public int NumeroHabitaciones { get; set; }
     public string? Observaciones { get; set; }
+    public List<int> HabitacionesIds { get; set; } = new List<int>();
 }
