@@ -19,4 +19,8 @@ public interface IEstanciaService
     Task<Estancia> CheckinAsync(CheckinCreateDto dto, int idUsuario);
     Task<Reserva> CreateReservaAsync(ReservaCreateDto dto, int idUsuario);
     Task<bool> CancelarReservaAsync(int idReserva);
+    Task RegistrarSalidaTemporalAsync(int estanciaId, bool llavesDejadas);
+    Task RegistrarRegresoAsync(int estanciaId);
+    Task<Huesped> AgregarHuespedCompletoAsync(int estanciaId, AgregarHuespedDto dto);
+    Task<CheckoutResultDto> RealizarCheckoutCompletoAsync(int estanciaId, int idUsuario);
 }
