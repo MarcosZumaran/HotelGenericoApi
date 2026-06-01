@@ -17,6 +17,8 @@ public class Estancia
     public DateTime? HoraSalidaTemporal { get; set; }
     public DateTime? HoraRegresoTemporal { get; set; }
     public bool? LlavesDejadas { get; set; } // null = nunca salió, true=dejó, false=no dejó
+    public int? IdReservaCorporativa { get; set; }
+    public ReservaCorporativa? ReservaCorporativa { get; set; }
 
     // Navegación
     public Reserva? Reserva { get; set; }

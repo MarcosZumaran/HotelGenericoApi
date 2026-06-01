@@ -29,6 +29,7 @@ public class HotelDbContext : DbContext
     public DbSet<Estancia> Estancias => Set<Estancia>();
     public DbSet<Huesped> Huespedes => Set<Huesped>();
     public DbSet<Producto> Productos => Set<Producto>();
+    public DbSet<ReservaCorporativa> ReservasCorporativas => Set<ReservaCorporativa>();
     public DbSet<StockHabitacion> StockHabitaciones => Set<StockHabitacion>();
     public DbSet<ItemEstancia> ItemsEstancia => Set<ItemEstancia>();
     public DbSet<Venta> Ventas => Set<Venta>();
@@ -296,6 +297,11 @@ public class HotelDbContext : DbContext
             entity.HasOne(e => e.Reserva).WithMany().HasForeignKey(e => e.IdReserva).HasConstraintName("fk_estancia_reserva");
             entity.HasOne(e => e.Habitacion).WithMany(h => h.Estancias).HasForeignKey(e => e.IdHabitacion).HasConstraintName("fk_estancia_habitacion");
             entity.HasOne(e => e.ClienteTitular).WithMany().HasForeignKey(e => e.IdClienteTitular).HasConstraintName("fk_estancia_cliente");
+            entity.Property(e => e.IdReservaCorporativa).HasColumnName("id_reserva_corporativa");
+            entity.HasOne(e => e.ReservaCorporativa)
+                .WithMany(rc => rc.Estancias)
+                .HasForeignKey(e => e.IdReservaCorporativa)
+                .HasConstraintName("fk_estancia_reserva_corporativa");
         });
 
         modelBuilder.Entity<Huesped>(entity =>
@@ -333,6 +339,25 @@ public class HotelDbContext : DbContext
             entity.Property(e => e.EsAmenidad).HasColumnName("es_amenidad");
             entity.Property(e => e.EsVendibleEnTienda).HasColumnName("es_vendible_en_tienda");
             entity.Property(e => e.StockPorHabitacion).HasColumnName("stock_por_habitacion");
+        });
+
+        modelBuilder.Entity<ReservaCorporativa>(entity =>
+        {
+            entity.ToTable("reserva_corporativa");
+            entity.HasKey(e => e.IdReservaCorporativa);
+            entity.Property(e => e.IdReservaCorporativa).HasColumnName("id_reserva_corporativa").ValueGeneratedOnAdd();
+            entity.Property(e => e.IdClienteEmpresa).HasColumnName("id_cliente_empresa");
+            entity.Property(e => e.FechaInicio).HasColumnName("fecha_inicio").HasColumnType("date");
+            entity.Property(e => e.FechaFin).HasColumnName("fecha_fin").HasColumnType("date");
+            entity.Property(e => e.NumeroHabitaciones).HasColumnName("numero_habitaciones");
+            entity.Property(e => e.Estado).HasColumnName("estado").HasMaxLength(20).HasDefaultValue("Pendiente");
+            entity.Property(e => e.Observaciones).HasColumnName("observaciones").HasMaxLength(300);
+            entity.Property(e => e.FechaRegistro).HasColumnName("fecha_registro").HasDefaultValueSql("GETDATE()");
+
+            entity.HasOne(e => e.ClienteEmpresa)
+                .WithMany()
+                .HasForeignKey(e => e.IdClienteEmpresa)
+                .HasConstraintName("fk_reserva_corporativa_cliente");
         });
 
         modelBuilder.Entity<StockHabitacion>(entity =>

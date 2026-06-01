@@ -592,9 +592,7 @@ IF NOT EXISTS (SELECT 1 FROM producto WHERE nombre = 'Toalla mediana')
     VALUES ('Toalla mediana', 'Toalla de baño', 0, '10', (SELECT id_categoria FROM categoria_producto WHERE nombre = 'Amenidades'), 100, 1, 0, 2);
 GO
 
--- =====================================================
 -- 1. Tabla reserva_corporativa (agrupa múltiples habitaciones)
--- =====================================================
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'reserva_corporativa')
 BEGIN
     CREATE TABLE reserva_corporativa (
@@ -611,9 +609,7 @@ BEGIN
 END
 GO
 
--- =====================================================
--- 2. Agregar columna a estancia para vincular a reserva corporativa
--- =====================================================
+-- Agregar columna a estancia para vincular a reserva corporativa
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('estancia') AND name = 'id_reserva_corporativa')
 BEGIN
     ALTER TABLE estancia ADD id_reserva_corporativa INT NULL;
@@ -622,9 +618,7 @@ BEGIN
 END
 GO
 
--- =====================================================
--- 3. Índice para búsquedas rápidas
--- =====================================================
+-- Índice para búsquedas rápidas
 CREATE INDEX ix_estancia_reserva_corporativa ON estancia(id_reserva_corporativa) WHERE id_reserva_corporativa IS NOT NULL;
 GO
 

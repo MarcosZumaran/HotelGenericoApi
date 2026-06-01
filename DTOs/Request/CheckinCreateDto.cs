@@ -16,4 +16,5 @@ public sealed record CheckinCreateDto
     public int? IdClienteExistente { get; set; }
     public DateTime? FechaEntradaPrevista { get; init; }
     public DateTime? FechaSalidaPrevista { get; init; }
+    public int? IdReservaCorporativa { get; set; }
 }
