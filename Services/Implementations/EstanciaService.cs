@@ -16,11 +16,14 @@ public class EstanciaService : IEstanciaService
     private readonly ILogger<EstanciaService> _logger;
     private readonly IHubContext<HabitacionHub> _hubContext;
 
-    public EstanciaService(HotelDbContext db, ILogger<EstanciaService> logger, IHubContext<HabitacionHub> hubContext)
+    private readonly IAmenidadService _amenidadService;
+
+    public EstanciaService(HotelDbContext db, ILogger<EstanciaService> logger, IHubContext<HabitacionHub> hubContext, IAmenidadService amenidadService)
     {
         _db = db;
         _logger = logger;
         _hubContext = hubContext;
+        _amenidadService = amenidadService;
     }
 
     // CONSULTAS
@@ -140,6 +143,8 @@ public class EstanciaService : IEstanciaService
                 numeroHabitacion = habitacion.NumeroHabitacion,
                 cliente = $"{cliente.Nombres} {cliente.Apellidos}"
             });
+
+            await _amenidadService.InicializarStockHabitacionAsync(estancia.IdHabitacion);
 
             return estancia;
         }

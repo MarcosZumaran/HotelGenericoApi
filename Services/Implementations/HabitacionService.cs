@@ -14,12 +14,14 @@ public class HabitacionService : IHabitacionService
     private readonly HotelDbContext _db;
     private readonly ILogger<HabitacionService> _logger;
     private readonly IHubContext<HabitacionHub> _hubContext;
+    private readonly IAmenidadService _amenidadService;
 
-    public HabitacionService(HotelDbContext db, ILogger<HabitacionService> logger, IHubContext<HabitacionHub> hubContext)
+    public HabitacionService(HotelDbContext db, ILogger<HabitacionService> logger, IHubContext<HabitacionHub> hubContext, IAmenidadService amenidadService)
     {
         _db = db;
         _logger = logger;
         _hubContext = hubContext;
+        _amenidadService = amenidadService;
     }
 
     public async Task<List<Habitacion>> GetAllAsync()
@@ -114,7 +116,14 @@ public class HabitacionService : IHabitacionService
 
             _logger.LogInformation("Habitación {Id} cambió de estado {Anterior} a {Nuevo}", idHabitacion, estadoAnterior, idNuevoEstado);
 
-            // Enviar notificación en tiempo real a todos los clientes conectados
+            // 👇 REPOSICIÓN DE AMENIDADES SI LA HABITACIÓN PASA A DISPONIBLE
+            if (idNuevoEstado == 1) // 1 = Disponible (según tu semilla)
+            {
+                await _amenidadService.ReponerStockHabitacionAsync(idHabitacion);
+                _logger.LogInformation("Amenidades repuestas para habitación {Id}", idHabitacion);
+            }
+
+            // Enviar notificación en tiempo real
             await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
             {
                 idHabitacion,
