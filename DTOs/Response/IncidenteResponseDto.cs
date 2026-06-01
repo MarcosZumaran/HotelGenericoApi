@@ -13,4 +13,5 @@ public class IncidenteResponseDto
     public bool Resuelto { get; set; }
     public DateTime? FechaRegistro { get; set; }
     public string? ReportadoPorNombre { get; set; }
+    public string? ImagenUrl { get; set; }
 }

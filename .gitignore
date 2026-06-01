@@ -536,4 +536,4 @@ obj/
 /appsettings.json
 
 # Imagenes
-wwwroot/imagenes/
+wwwroot

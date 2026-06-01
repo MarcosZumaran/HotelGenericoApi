@@ -20,6 +20,7 @@ public class IncidenteController : ControllerBase
     }
 
     // INCIDENTES
+
     [HttpGet("incidentes")]
     public async Task<IActionResult> GetAllIncidentes()
     {
@@ -43,7 +44,8 @@ public class IncidenteController : ControllerBase
     }
 
     [HttpPost("incidentes")]
-    public async Task<IActionResult> CreateIncidente([FromBody] IncidenteCreateDto dto)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> CreateIncidente([FromForm] IncidenteCreateDto dto, IFormFile? imagen)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
@@ -51,7 +53,7 @@ public class IncidenteController : ControllerBase
 
         try
         {
-            var incidente = await _incidenteService.CreateIncidenteAsync(dto, userId);
+            var incidente = await _incidenteService.CreateIncidenteAsync(dto, userId, imagen);
             return CreatedAtAction(nameof(GetIncidenteById), new { id = incidente.IdIncidente }, incidente);
         }
         catch (Exception ex)
@@ -77,6 +79,7 @@ public class IncidenteController : ControllerBase
     }
 
     // OBJETOS PERDIDOS
+
     [HttpGet("objetos")]
     public async Task<IActionResult> GetAllObjetos()
     {
@@ -100,11 +103,12 @@ public class IncidenteController : ControllerBase
     }
 
     [HttpPost("objetos")]
-    public async Task<IActionResult> CreateObjeto([FromBody] ObjetoPerdidoCreateDto dto)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> CreateObjeto([FromForm] ObjetoPerdidoCreateDto dto, IFormFile? imagen)
     {
         try
         {
-            var objeto = await _incidenteService.CreateObjetoPerdidoAsync(dto);
+            var objeto = await _incidenteService.CreateObjetoPerdidoAsync(dto, imagen);
             return CreatedAtAction(nameof(GetObjetoById), new { id = objeto.IdObjeto }, objeto);
         }
         catch (Exception ex)

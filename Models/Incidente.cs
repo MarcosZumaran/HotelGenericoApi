@@ -12,6 +12,7 @@ public class Incidente
     public bool Resuelto { get; set; }
     public DateTime? FechaRegistro { get; set; }
     public int? ReportadoPor { get; set; }
+    public string? ImagenUrl { get; set; }
 
     // Navegación
     public Estancia? Estancia { get; set; }

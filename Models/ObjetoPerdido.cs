@@ -10,6 +10,7 @@ public class ObjetoPerdido
     public string Estado { get; set; } = "pendiente"; // pendiente, entregado, desechado
     public string? EntregadoA { get; set; }
     public DateTime? FechaEntregado { get; set; }
+    public string? ImagenUrl { get; set; }
 
     // Navegación
     public Habitacion? Habitacion { get; set; }

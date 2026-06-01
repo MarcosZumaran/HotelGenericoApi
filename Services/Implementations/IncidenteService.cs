@@ -1,22 +1,27 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Interfaces;
+using ImageMagick;
 
 namespace HotelGenericoApi.Services.Implementations;
 
 public class IncidenteService : IIncidenteService
 {
     private readonly HotelDbContext _db;
+    private readonly IWebHostEnvironment _webHostEnvironment;
 
-    public IncidenteService(HotelDbContext db)
+    public IncidenteService(HotelDbContext db, IWebHostEnvironment webHostEnvironment)
     {
         _db = db;
+        _webHostEnvironment = webHostEnvironment;
     }
 
-    //  INCIDENTES
+    // INCIDENTES
+
     public async Task<IEnumerable<IncidenteResponseDto>> GetAllIncidentesAsync()
     {
         return await _db.Incidentes
@@ -35,7 +40,8 @@ public class IncidenteService : IIncidenteService
                 CobradoAlCliente = i.CobradoAlCliente,
                 Resuelto = i.Resuelto,
                 FechaRegistro = i.FechaRegistro,
-                ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null
+                ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null,
+                ImagenUrl = i.ImagenUrl
             })
             .ToListAsync();
     }
@@ -61,7 +67,8 @@ public class IncidenteService : IIncidenteService
             CobradoAlCliente = i.CobradoAlCliente,
             Resuelto = i.Resuelto,
             FechaRegistro = i.FechaRegistro,
-            ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null
+            ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null,
+            ImagenUrl = i.ImagenUrl
         };
     }
 
@@ -84,17 +91,19 @@ public class IncidenteService : IIncidenteService
                 CobradoAlCliente = i.CobradoAlCliente,
                 Resuelto = i.Resuelto,
                 FechaRegistro = i.FechaRegistro,
-                ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null
+                ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null,
+                ImagenUrl = i.ImagenUrl
             })
             .ToListAsync();
     }
 
-    public async Task<IncidenteResponseDto> CreateIncidenteAsync(IncidenteCreateDto dto, int idUsuario)
+    public async Task<IncidenteResponseDto> CreateIncidenteAsync(IncidenteCreateDto dto, int idUsuario, IFormFile? imagen)
     {
-        // Validar que la habitación exista
         var habitacion = await _db.Habitaciones.FindAsync(dto.IdHabitacion);
         if (habitacion == null)
             throw new ArgumentException("Habitación no encontrada.");
+
+        var imagenUrl = await GuardarImagenAsync(imagen, "incidentes");
 
         var incidente = new Incidente
         {
@@ -106,7 +115,8 @@ public class IncidenteService : IIncidenteService
             CobradoAlCliente = dto.CobradoAlCliente,
             Resuelto = false,
             FechaRegistro = DateTime.UtcNow,
-            ReportadoPor = idUsuario
+            ReportadoPor = idUsuario,
+            ImagenUrl = imagenUrl
         };
 
         _db.Incidentes.Add(incidente);
@@ -136,6 +146,7 @@ public class IncidenteService : IIncidenteService
     }
 
     // OBJETOS PERDIDOS
+
     public async Task<IEnumerable<ObjetoPerdidoResponseDto>> GetAllObjetosPerdidosAsync()
     {
         return await _db.ObjetosPerdidos
@@ -152,7 +163,8 @@ public class IncidenteService : IIncidenteService
                 FechaHallazgo = o.FechaHallazgo,
                 Estado = o.Estado,
                 EntregadoA = o.EntregadoA,
-                FechaEntregado = o.FechaEntregado
+                FechaEntregado = o.FechaEntregado,
+                ImagenUrl = o.ImagenUrl
             })
             .ToListAsync();
     }
@@ -176,7 +188,8 @@ public class IncidenteService : IIncidenteService
             FechaHallazgo = o.FechaHallazgo,
             Estado = o.Estado,
             EntregadoA = o.EntregadoA,
-            FechaEntregado = o.FechaEntregado
+            FechaEntregado = o.FechaEntregado,
+            ImagenUrl = o.ImagenUrl
         };
     }
 
@@ -196,20 +209,24 @@ public class IncidenteService : IIncidenteService
                 FechaHallazgo = o.FechaHallazgo,
                 Estado = o.Estado,
                 EntregadoA = o.EntregadoA,
-                FechaEntregado = o.FechaEntregado
+                FechaEntregado = o.FechaEntregado,
+                ImagenUrl = o.ImagenUrl
             })
             .ToListAsync();
     }
 
-    public async Task<ObjetoPerdidoResponseDto> CreateObjetoPerdidoAsync(ObjetoPerdidoCreateDto dto)
+    public async Task<ObjetoPerdidoResponseDto> CreateObjetoPerdidoAsync(ObjetoPerdidoCreateDto dto, IFormFile? imagen)
     {
+        var imagenUrl = await GuardarImagenAsync(imagen, "objetos");
+
         var objeto = new ObjetoPerdido
         {
             IdHabitacion = dto.IdHabitacion,
             IdEstancia = dto.IdEstancia,
             Descripcion = dto.Descripcion,
             FechaHallazgo = DateTime.UtcNow,
-            Estado = "pendiente"
+            Estado = "pendiente",
+            ImagenUrl = imagenUrl
         };
 
         _db.ObjetosPerdidos.Add(objeto);
@@ -238,5 +255,37 @@ public class IncidenteService : IIncidenteService
         objeto.Estado = "desechado";
         await _db.SaveChangesAsync();
         return true;
+    }
+
+    // MÉTODOS PRIVADOS
+
+    private async Task<string?> GuardarImagenAsync(IFormFile? file, string subcarpeta)
+    {
+        if (file == null || file.Length == 0) return null;
+
+        var extensiones = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!extensiones.Contains(ext))
+            throw new InvalidOperationException("Formato de imagen no permitido. Use .jpg, .jpeg, .png o .webp.");
+
+        var nombreArchivo = $"{Guid.NewGuid()}.webp";
+        var rutaRelativa = Path.Combine("imagenes", subcarpeta, nombreArchivo);
+        var rutaCompleta = Path.Combine(_webHostEnvironment.WebRootPath, rutaRelativa);
+        Directory.CreateDirectory(Path.GetDirectoryName(rutaCompleta)!);
+
+        using var stream = file.OpenReadStream();
+        using var image = new MagickImage(stream);
+
+        if (image.Width > 800)
+        {
+            var geometry = new MagickGeometry(800);
+            image.Resize(geometry);
+        }
+
+        image.Quality = 80;
+        image.Format = MagickFormat.WebP;
+        await image.WriteAsync(rutaCompleta);
+
+        return $"/{rutaRelativa.Replace(Path.DirectorySeparatorChar, '/')}";
     }
 }

@@ -8,4 +8,5 @@ public class IncidenteCreateDto
     public string Descripcion { get; set; } = string.Empty;
     public decimal? CostoEstimado { get; set; }
     public bool CobradoAlCliente { get; set; } = false;
+    public string? ImagenUrl { get; set; }
 }

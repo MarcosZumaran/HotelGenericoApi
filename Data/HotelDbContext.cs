@@ -527,6 +527,7 @@ public class HotelDbContext : DbContext
                 .HasDatabaseName("ix_incidente_habitacion_fecha")
                 .IsDescending(false, true);
             entity.HasIndex(e => e.IdEstancia).HasDatabaseName("ix_incidente_estancia");
+            entity.Property(e => e.ImagenUrl).HasColumnName("imagen_url").HasMaxLength(255);
         });
 
         modelBuilder.Entity<ObjetoPerdido>(entity =>
@@ -554,6 +555,7 @@ public class HotelDbContext : DbContext
 
             entity.HasIndex(e => e.Estado).HasDatabaseName("ix_objeto_estado");
             entity.HasIndex(e => e.FechaHallazgo).HasDatabaseName("ix_objeto_fecha").IsDescending();
+            entity.Property(e => e.ImagenUrl).HasColumnName("imagen_url").HasMaxLength(255);
         });
 
         // Vistas keyless

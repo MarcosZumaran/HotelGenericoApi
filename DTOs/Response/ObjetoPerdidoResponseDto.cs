@@ -11,4 +11,5 @@ public class ObjetoPerdidoResponseDto
     public string Estado { get; set; } = string.Empty;
     public string? EntregadoA { get; set; }
     public DateTime? FechaEntregado { get; set; }
+    public string? ImagenUrl { get; set; }
 }
