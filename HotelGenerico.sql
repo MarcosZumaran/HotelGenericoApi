@@ -683,4 +683,28 @@ BEGIN
 END
 GO
 
+-- Tabla de historial de traslados
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'historial_traslado')
+BEGIN
+    CREATE TABLE historial_traslado (
+        id_traslado INT PRIMARY KEY IDENTITY(1,1),
+        id_estancia INT NOT NULL,
+        id_habitacion_origen INT NOT NULL,
+        id_habitacion_destino INT NOT NULL,
+        motivo NVARCHAR(200) NULL,
+        fecha_traslado DATETIME DEFAULT GETDATE(),
+        usuario_id INT NOT NULL,
+        ajuste_monto DECIMAL(10,2) NULL, -- diferencia de precio (positivo o negativo)
+        CONSTRAINT fk_traslado_estancia FOREIGN KEY (id_estancia) REFERENCES estancia(id_estancia),
+        CONSTRAINT fk_traslado_habitacion_origen FOREIGN KEY (id_habitacion_origen) REFERENCES habitacion(id_habitacion),
+        CONSTRAINT fk_traslado_habitacion_destino FOREIGN KEY (id_habitacion_destino) REFERENCES habitacion(id_habitacion),
+        CONSTRAINT fk_traslado_usuario FOREIGN KEY (usuario_id) REFERENCES usuario(id_usuario)
+    );
+END
+GO
+
+CREATE INDEX ix_traslado_estancia ON historial_traslado(id_estancia);
+CREATE INDEX ix_traslado_fecha ON historial_traslado(fecha_traslado DESC);
+GO
+
 PRINT 'Base de datos HotelDB creada con éxito.';
