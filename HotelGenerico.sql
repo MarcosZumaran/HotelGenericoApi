@@ -592,7 +592,7 @@ IF NOT EXISTS (SELECT 1 FROM producto WHERE nombre = 'Toalla mediana')
     VALUES ('Toalla mediana', 'Toalla de baño', 0, '10', (SELECT id_categoria FROM categoria_producto WHERE nombre = 'Amenidades'), 100, 1, 0, 2);
 GO
 
--- 1. Tabla reserva_corporativa (agrupa múltiples habitaciones)
+-- Tabla reserva_corporativa (agrupa múltiples habitaciones)
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'reserva_corporativa')
 BEGIN
     CREATE TABLE reserva_corporativa (
@@ -621,5 +621,50 @@ GO
 -- Índice para búsquedas rápidas
 CREATE INDEX ix_estancia_reserva_corporativa ON estancia(id_reserva_corporativa) WHERE id_reserva_corporativa IS NOT NULL;
 GO
+
+-- Tabla: incidente (daños, manchas, roturas)
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'incidente')
+BEGIN
+    CREATE TABLE incidente (
+        id_incidente INT PRIMARY KEY IDENTITY(1,1),
+        id_estancia INT NULL,
+        id_habitacion INT NOT NULL,
+        tipo NVARCHAR(50) NOT NULL,              -- 'daño', 'mancha', 'rotura'
+        descripcion NVARCHAR(500) NOT NULL,
+        costo_estimado DECIMAL(10,2) NULL,
+        cobrado_al_cliente BIT NOT NULL DEFAULT 0,
+        resuelto BIT NOT NULL DEFAULT 0,
+        fecha_registro DATETIME DEFAULT GETDATE(),
+        reportado_por INT NULL,
+        CONSTRAINT fk_incidente_estancia FOREIGN KEY (id_estancia) REFERENCES estancia(id_estancia),
+        CONSTRAINT fk_incidente_habitacion FOREIGN KEY (id_habitacion) REFERENCES habitacion(id_habitacion),
+        CONSTRAINT fk_incidente_usuario FOREIGN KEY (reportado_por) REFERENCES usuario(id_usuario)
+    );
+END
+GO
+
+CREATE INDEX ix_incidente_habitacion_fecha ON incidente(id_habitacion, fecha_registro DESC);
+CREATE INDEX ix_incidente_estancia ON incidente(id_estancia);
+
+-- Tabla: objeto_perdido
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'objeto_perdido')
+BEGIN
+    CREATE TABLE objeto_perdido (
+        id_objeto INT PRIMARY KEY IDENTITY(1,1),
+        id_habitacion INT NULL,
+        id_estancia INT NULL,
+        descripcion NVARCHAR(200) NOT NULL,
+        fecha_hallazgo DATETIME DEFAULT GETDATE(),
+        estado NVARCHAR(20) NOT NULL DEFAULT 'pendiente',  -- 'pendiente', 'entregado', 'desechado'
+        entregado_a NVARCHAR(100) NULL,
+        fecha_entregado DATETIME NULL,
+        CONSTRAINT fk_objeto_habitacion FOREIGN KEY (id_habitacion) REFERENCES habitacion(id_habitacion),
+        CONSTRAINT fk_objeto_estancia FOREIGN KEY (id_estancia) REFERENCES estancia(id_estancia)
+    );
+END
+GO
+
+CREATE INDEX ix_objeto_estado ON objeto_perdido(estado);
+CREATE INDEX ix_objeto_fecha ON objeto_perdido(fecha_hallazgo DESC);
 
 PRINT 'Base de datos HotelDB creada con éxito.';
