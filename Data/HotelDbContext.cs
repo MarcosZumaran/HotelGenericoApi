@@ -37,9 +37,9 @@ public class HotelDbContext : DbContext
     public DbSet<Comprobante> Comprobantes => Set<Comprobante>();
     public DbSet<CierreCajaEnvio> CierresCajaEnvio => Set<CierreCajaEnvio>();
     public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
-
     public DbSet<Incidente> Incidentes => Set<Incidente>();
     public DbSet<ObjetoPerdido> ObjetosPerdidos => Set<ObjetoPerdido>();
+    public DbSet<HistorialTraslado> HistorialTraslados => Set<HistorialTraslado>();
 
     // Vistas keyless
     public DbSet<VCierreCajaDiario> VCierreCajaDiario => Set<VCierreCajaDiario>();
@@ -556,6 +556,43 @@ public class HotelDbContext : DbContext
             entity.HasIndex(e => e.Estado).HasDatabaseName("ix_objeto_estado");
             entity.HasIndex(e => e.FechaHallazgo).HasDatabaseName("ix_objeto_fecha").IsDescending();
             entity.Property(e => e.ImagenUrl).HasColumnName("imagen_url").HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<HistorialTraslado>(entity =>
+        {
+            entity.ToTable("historial_traslado");
+            entity.HasKey(e => e.IdTraslado);
+            entity.Property(e => e.IdTraslado).HasColumnName("id_traslado").ValueGeneratedOnAdd();
+            entity.Property(e => e.IdEstancia).HasColumnName("id_estancia");
+            entity.Property(e => e.IdHabitacionOrigen).HasColumnName("id_habitacion_origen");
+            entity.Property(e => e.IdHabitacionDestino).HasColumnName("id_habitacion_destino");
+            entity.Property(e => e.Motivo).HasColumnName("motivo").HasMaxLength(200);
+            entity.Property(e => e.FechaTraslado).HasColumnName("fecha_traslado").HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.UsuarioId).HasColumnName("usuario_id");
+            entity.Property(e => e.AjusteMonto).HasColumnName("ajuste_monto").HasColumnType("decimal(10,2)");
+
+            entity.HasOne(e => e.Estancia)
+                .WithMany()
+                .HasForeignKey(e => e.IdEstancia)
+                .HasConstraintName("fk_traslado_estancia");
+
+            entity.HasOne(e => e.HabitacionOrigen)
+                .WithMany()
+                .HasForeignKey(e => e.IdHabitacionOrigen)
+                .HasConstraintName("fk_traslado_habitacion_origen");
+
+            entity.HasOne(e => e.HabitacionDestino)
+                .WithMany()
+                .HasForeignKey(e => e.IdHabitacionDestino)
+                .HasConstraintName("fk_traslado_habitacion_destino");
+
+            entity.HasOne(e => e.Usuario)
+                .WithMany()
+                .HasForeignKey(e => e.UsuarioId)
+                .HasConstraintName("fk_traslado_usuario");
+
+            entity.HasIndex(e => e.IdEstancia).HasDatabaseName("ix_traslado_estancia");
+            entity.HasIndex(e => e.FechaTraslado).HasDatabaseName("ix_traslado_fecha").IsDescending();
         });
 
         // Vistas keyless
