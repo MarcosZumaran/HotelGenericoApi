@@ -287,7 +287,7 @@ public class EstanciaService : IEstanciaService
                 TotalHabitacion = totalHabitacion,
                 TotalConsumos = totalConsumos,
                 TotalFinal = totalFinal,
-                ComprobanteId = comprobanteId
+                ComprobanteId = (int)comprobanteId
             };
         }
         catch
