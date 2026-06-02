@@ -4,21 +4,24 @@ using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Interfaces;
+using Microsoft.AspNetCore.SignalR;
+using HotelGenericoApi.Hubs;
 
 namespace HotelGenericoApi.Services.Implementations;
 
 public class ReservaCorporativaService : IReservaCorporativaService
 {
     private readonly HotelDbContext _db;
+    private readonly IHubContext<HabitacionHub> _hubContext;
 
-    public ReservaCorporativaService(HotelDbContext db)
+    public ReservaCorporativaService(HotelDbContext db, IHubContext<HabitacionHub> hubContext)
     {
         _db = db;
+        _hubContext = hubContext;
     }
 
     public async Task<IEnumerable<ReservaCorporativaResponseDto>> GetAllAsync()
     {
-        // 1. Cargar datos desde la BD con las relaciones necesarias
         var reservas = await _db.ReservasCorporativas
             .Include(r => r.ClienteEmpresa)
             .Include(r => r.Estancias)
@@ -26,7 +29,6 @@ public class ReservaCorporativaService : IReservaCorporativaService
             .AsNoTracking()
             .ToListAsync();
 
-        // 2. Calcular el total acumulado en memoria (LINQ to Objects)
         var result = reservas.Select(r => new ReservaCorporativaResponseDto
         {
             IdReservaCorporativa = r.IdReservaCorporativa,
@@ -50,7 +52,6 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
     public async Task<ReservaCorporativaResponseDto?> GetByIdAsync(int id)
     {
-        // 1. Cargar la reserva específica con todas las relaciones
         var reserva = await _db.ReservasCorporativas
             .Include(r => r.ClienteEmpresa)
             .Include(r => r.Estancias)
@@ -59,7 +60,6 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
         if (reserva == null) return null;
 
-        // 2. Construir el DTO calculando el total en memoria
         return new ReservaCorporativaResponseDto
         {
             IdReservaCorporativa = reserva.IdReservaCorporativa,
@@ -82,11 +82,9 @@ public class ReservaCorporativaService : IReservaCorporativaService
     public async Task<ReservaCorporativaResponseDto> CreateAsync(ReservaCorporativaCreateDto dto, int idUsuario)
     {
         var cliente = await _db.Clientes.FindAsync(dto.IdClienteEmpresa);
-        // Verificar que el cliente sea una empresa
-        // if (cliente == null || cliente.TipoDocumento != "6") throw new ArgumentException("El cliente debe ser una empresa con RUC (TipoDocumento = 6).");
-        // Deshabilitado para permitir pruebas con clientes naturales, dado a que pueden hacer reservaciones familiares, y así no limitar el desarrollo solo a clientes empresariales.
+        if (cliente == null)
+            throw new ArgumentException("Cliente no encontrado.");
 
-        // Crear cabecera de reserva múltiple
         var reservaMultiple = new ReservaCorporativa
         {
             IdClienteEmpresa = dto.IdClienteEmpresa,
@@ -98,41 +96,53 @@ public class ReservaCorporativaService : IReservaCorporativaService
             FechaRegistro = DateTime.UtcNow
         };
 
-        _db.ReservasCorporativas.Add(reservaMultiple);
-        await _db.SaveChangesAsync();
-
-        // Crear una reserva individual por cada habitación
-        foreach (var habId in dto.HabitacionesIds)
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
         {
-            var habitacion = await _db.Habitaciones.FindAsync(habId);
-            if (habitacion == null) continue;
+            _db.ReservasCorporativas.Add(reservaMultiple);
+            await _db.SaveChangesAsync();
 
-            var reserva = new Reserva
+            // Crear una reserva individual por cada habitación
+            foreach (var habId in dto.HabitacionesIds)
             {
-                IdCliente = dto.IdClienteEmpresa,
-                IdHabitacion = habId,
-                IdUsuario = idUsuario,
-                FechaRegistro = DateTime.UtcNow,
-                FechaEntradaPrevista = dto.FechaInicio,
-                FechaSalidaPrevista = dto.FechaFin,
-                MontoTotal = CalcularMontoTotal(dto.FechaFin, habitacion.PrecioNoche), // implementar este helper
-                Estado = "Confirmada",
-                EsNoShow = false,
-                Observaciones = $"Reserva múltiple #{reservaMultiple.IdReservaCorporativa}"
-            };
-            _db.Reservas.Add(reserva);
+                var habitacion = await _db.Habitaciones.FindAsync(habId);
+                if (habitacion == null) continue;
+
+                var noches = Math.Max(1, (int)(dto.FechaFin - dto.FechaInicio).TotalDays);
+                var montoTotal = noches * habitacion.PrecioNoche;
+
+                var reserva = new Reserva
+                {
+                    IdCliente = dto.IdClienteEmpresa,
+                    IdHabitacion = habId,
+                    IdUsuario = idUsuario,
+                    FechaRegistro = DateTime.UtcNow,
+                    FechaEntradaPrevista = dto.FechaInicio,
+                    FechaSalidaPrevista = dto.FechaFin,
+                    MontoTotal = montoTotal,
+                    Estado = "Confirmada",
+                    EsNoShow = false,
+                    Observaciones = $"Reserva múltiple #{reservaMultiple.IdReservaCorporativa}"
+                };
+                _db.Reservas.Add(reserva);
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            // Notificar a cada habitación que tiene una nueva reserva
+            foreach (var habId in dto.HabitacionesIds)
+            {
+                await _hubContext.Clients.All.SendAsync("ReservaCreada", new { idHabitacion = habId });
+            }
+
+            return (await GetByIdAsync(reservaMultiple.IdReservaCorporativa))!;
         }
-
-        await _db.SaveChangesAsync();
-
-        return (await GetByIdAsync(reservaMultiple.IdReservaCorporativa))!;
-    }
-
-    // Helper (puedes copiarlo de EstanciaService)
-    private decimal CalcularMontoTotal(DateTime fechaSalida, decimal precioNoche)
-    {
-        var noches = Math.Max(1, (int)(fechaSalida.Date - DateTime.UtcNow.Date).TotalDays);
-        return noches * precioNoche;
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<bool> UpdateAsync(int id, ReservaCorporativaCreateDto dto)
@@ -140,13 +150,12 @@ public class ReservaCorporativaService : IReservaCorporativaService
         var reserva = await _db.ReservasCorporativas.FindAsync(id);
         if (reserva == null) return false;
 
-        // Solo se puede modificar si está Pendiente
         if (reserva.Estado != "Pendiente")
             throw new InvalidOperationException("Solo se pueden modificar reservas en estado Pendiente.");
 
         reserva.FechaInicio = dto.FechaInicio;
         reserva.FechaFin = dto.FechaFin;
-        reserva.NumeroHabitaciones = dto.NumeroHabitaciones;
+        reserva.NumeroHabitaciones = dto.HabitacionesIds.Count;
         reserva.Observaciones = dto.Observaciones;
 
         await _db.SaveChangesAsync();
@@ -186,17 +195,12 @@ public class ReservaCorporativaService : IReservaCorporativaService
         if (reserva.Estado == "Finalizada")
             throw new InvalidOperationException("La reserva ya está finalizada.");
 
-        // Verificar que todas las estancias hayan hecho checkout
         var estanciasPendientes = reserva.Estancias.Any(e => e.FechaCheckoutReal == null);
         if (estanciasPendientes)
             throw new InvalidOperationException("No se puede finalizar porque hay estancias activas sin checkout.");
 
-        // Calcular total acumulado de todas las estancias
         decimal totalFinal = reserva.Estancias.Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0));
 
-        // Generar comprobante único (factura) a nombre de la empresa
-        // Aquí debes integrar tu lógica de ComprobanteService
-        // Por ahora, simulamos la creación
         var comprobante = new Comprobante
         {
             IdEstancia = null,
@@ -222,7 +226,6 @@ public class ReservaCorporativaService : IReservaCorporativaService
         return (await GetByIdAsync(id))!;
     }
 
-    // Verifica si la corporativa aún tiene cupo para nuevas estancias
     public async Task<bool> ValidarYAsignarHabitacionAsync(int idReservaCorporativa)
     {
         var reserva = await _db.ReservasCorporativas
