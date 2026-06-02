@@ -25,22 +25,22 @@ public class IncidenteService : IIncidenteService
     public async Task<IEnumerable<IncidenteResponseDto>> GetAllIncidentesAsync()
     {
         return await _db.Incidentes
-            .Include(i => i.Habitacion)
-            .Include(i => i.UsuarioReporte)
+            .Include(i => i.IdHabitacionNavigation)
+            .Include(i => i.ReportadoPorNavigation)
             .OrderByDescending(i => i.FechaRegistro)
             .Select(i => new IncidenteResponseDto
             {
                 IdIncidente = i.IdIncidente,
                 IdEstancia = i.IdEstancia,
                 IdHabitacion = i.IdHabitacion,
-                NumeroHabitacion = i.Habitacion != null ? i.Habitacion.NumeroHabitacion : "",
+                NumeroHabitacion = i.IdHabitacionNavigation != null ? i.IdHabitacionNavigation.NumeroHabitacion : "",
                 Tipo = i.Tipo,
                 Descripcion = i.Descripcion,
                 CostoEstimado = i.CostoEstimado,
                 CobradoAlCliente = i.CobradoAlCliente,
                 Resuelto = i.Resuelto,
                 FechaRegistro = i.FechaRegistro,
-                ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null,
+                ReportadoPorNombre = i.ReportadoPorNavigation != null ? i.ReportadoPorNavigation.Username : null,
                 ImagenUrl = i.ImagenUrl
             })
             .ToListAsync();
@@ -49,8 +49,8 @@ public class IncidenteService : IIncidenteService
     public async Task<IncidenteResponseDto?> GetIncidenteByIdAsync(int id)
     {
         var i = await _db.Incidentes
-            .Include(i => i.Habitacion)
-            .Include(i => i.UsuarioReporte)
+            .Include(i => i.IdHabitacionNavigation)
+            .Include(i => i.ReportadoPorNavigation)
             .FirstOrDefaultAsync(i => i.IdIncidente == id);
 
         if (i == null) return null;
@@ -60,14 +60,14 @@ public class IncidenteService : IIncidenteService
             IdIncidente = i.IdIncidente,
             IdEstancia = i.IdEstancia,
             IdHabitacion = i.IdHabitacion,
-            NumeroHabitacion = i.Habitacion != null ? i.Habitacion.NumeroHabitacion : "",
+            NumeroHabitacion = i.IdHabitacionNavigation != null ? i.IdHabitacionNavigation.NumeroHabitacion : "",
             Tipo = i.Tipo,
             Descripcion = i.Descripcion,
             CostoEstimado = i.CostoEstimado,
             CobradoAlCliente = i.CobradoAlCliente,
             Resuelto = i.Resuelto,
             FechaRegistro = i.FechaRegistro,
-            ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null,
+            ReportadoPorNombre = i.ReportadoPorNavigation != null ? i.ReportadoPorNavigation.Username : null,
             ImagenUrl = i.ImagenUrl
         };
     }
@@ -75,8 +75,8 @@ public class IncidenteService : IIncidenteService
     public async Task<IEnumerable<IncidenteResponseDto>> GetIncidentesByHabitacionAsync(int idHabitacion)
     {
         return await _db.Incidentes
-            .Include(i => i.Habitacion)
-            .Include(i => i.UsuarioReporte)
+            .Include(i => i.IdHabitacionNavigation)
+            .Include(i => i.ReportadoPorNavigation)
             .Where(i => i.IdHabitacion == idHabitacion)
             .OrderByDescending(i => i.FechaRegistro)
             .Select(i => new IncidenteResponseDto
@@ -84,14 +84,14 @@ public class IncidenteService : IIncidenteService
                 IdIncidente = i.IdIncidente,
                 IdEstancia = i.IdEstancia,
                 IdHabitacion = i.IdHabitacion,
-                NumeroHabitacion = i.Habitacion != null ? i.Habitacion.NumeroHabitacion : "",
+                NumeroHabitacion = i.IdHabitacionNavigation != null ? i.IdHabitacionNavigation.NumeroHabitacion : "",
                 Tipo = i.Tipo,
                 Descripcion = i.Descripcion,
                 CostoEstimado = i.CostoEstimado,
                 CobradoAlCliente = i.CobradoAlCliente,
                 Resuelto = i.Resuelto,
                 FechaRegistro = i.FechaRegistro,
-                ReportadoPorNombre = i.UsuarioReporte != null ? i.UsuarioReporte.Username : null,
+                ReportadoPorNombre = i.ReportadoPorNavigation != null ? i.ReportadoPorNavigation.Username : null,
                 ImagenUrl = i.ImagenUrl
             })
             .ToListAsync();
@@ -150,14 +150,14 @@ public class IncidenteService : IIncidenteService
     public async Task<IEnumerable<ObjetoPerdidoResponseDto>> GetAllObjetosPerdidosAsync()
     {
         return await _db.ObjetosPerdidos
-            .Include(o => o.Habitacion)
-            .Include(o => o.Estancia)
+            .Include(o => o.IdHabitacionNavigation)
+            .Include(o => o.IdEstanciaNavigation)
             .OrderByDescending(o => o.FechaHallazgo)
             .Select(o => new ObjetoPerdidoResponseDto
             {
                 IdObjeto = o.IdObjeto,
                 IdHabitacion = o.IdHabitacion,
-                NumeroHabitacion = o.Habitacion != null ? o.Habitacion.NumeroHabitacion : null,
+                NumeroHabitacion = o.IdHabitacionNavigation != null ? o.IdHabitacionNavigation.NumeroHabitacion : null,
                 IdEstancia = o.IdEstancia,
                 Descripcion = o.Descripcion,
                 FechaHallazgo = o.FechaHallazgo,
@@ -172,8 +172,8 @@ public class IncidenteService : IIncidenteService
     public async Task<ObjetoPerdidoResponseDto?> GetObjetoPerdidoByIdAsync(int id)
     {
         var o = await _db.ObjetosPerdidos
-            .Include(o => o.Habitacion)
-            .Include(o => o.Estancia)
+            .Include(o => o.IdHabitacionNavigation)
+            .Include(o => o.IdEstanciaNavigation)
             .FirstOrDefaultAsync(o => o.IdObjeto == id);
 
         if (o == null) return null;
@@ -182,7 +182,7 @@ public class IncidenteService : IIncidenteService
         {
             IdObjeto = o.IdObjeto,
             IdHabitacion = o.IdHabitacion,
-            NumeroHabitacion = o.Habitacion != null ? o.Habitacion.NumeroHabitacion : null,
+            NumeroHabitacion = o.IdHabitacionNavigation != null ? o.IdHabitacionNavigation.NumeroHabitacion : null,
             IdEstancia = o.IdEstancia,
             Descripcion = o.Descripcion,
             FechaHallazgo = o.FechaHallazgo,
@@ -196,14 +196,14 @@ public class IncidenteService : IIncidenteService
     public async Task<IEnumerable<ObjetoPerdidoResponseDto>> GetObjetosPendientesAsync()
     {
         return await _db.ObjetosPerdidos
-            .Include(o => o.Habitacion)
+            .Include(o => o.IdHabitacionNavigation)
             .Where(o => o.Estado == "pendiente")
             .OrderByDescending(o => o.FechaHallazgo)
             .Select(o => new ObjetoPerdidoResponseDto
             {
                 IdObjeto = o.IdObjeto,
                 IdHabitacion = o.IdHabitacion,
-                NumeroHabitacion = o.Habitacion != null ? o.Habitacion.NumeroHabitacion : null,
+                NumeroHabitacion = o.IdHabitacionNavigation != null ? o.IdHabitacionNavigation.NumeroHabitacion : null,
                 IdEstancia = o.IdEstancia,
                 Descripcion = o.Descripcion,
                 FechaHallazgo = o.FechaHallazgo,

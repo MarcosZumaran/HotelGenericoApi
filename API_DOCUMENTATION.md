@@ -1488,7 +1488,7 @@ Descarga un archivo de backup.
 ## Health Check
 
 ### GET /health
-Verifica que el servicio este operativo.
+Verifica que el servicio este operativo. **Nota:** Este endpoint esta fuera del prefijo `/api/v1`.
 
 - Auth: No
 - Response 200: `Healthy`
