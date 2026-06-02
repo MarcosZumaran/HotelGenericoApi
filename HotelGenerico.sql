@@ -719,4 +719,16 @@ CREATE TABLE habitacion_amenidad (
 );
 GO
 
+-- Agregar columna id_reserva_corporativa a la tabla reserva
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('reserva') AND name = 'id_reserva_corporativa')
+BEGIN
+    ALTER TABLE reserva ADD id_reserva_corporativa INT NULL;
+    ALTER TABLE reserva ADD CONSTRAINT fk_reserva_reserva_corporativa
+        FOREIGN KEY (id_reserva_corporativa) REFERENCES reserva_corporativa(id_reserva_corporativa);
+END
+GO
+
+CREATE INDEX IX_reserva_id_reserva_corporativa ON reserva(id_reserva_corporativa);
+GO
+
 PRINT 'Base de datos HotelDB creada con éxito.';
