@@ -1,9 +1,15 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class VCierreCajaDiario
+namespace HotelGenericoApi.Models;
+
+public partial class VCierreCajaDiario
 {
-    public DateOnly Fecha { get; set; }
-    public string? MetodoPago { get; set; }
-    public decimal Ingresos { get; set; }
-    public string? Concepto { get; set; }
+    public DateOnly? Fecha { get; set; }
+
+    public string MetodoPago { get; set; } = null!;
+
+    public decimal? Ingresos { get; set; }
+
+    public string Concepto { get; set; } = null!;
 }

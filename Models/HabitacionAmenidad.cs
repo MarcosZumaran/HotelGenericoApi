@@ -1,13 +1,19 @@
+﻿using System;
+using System.Collections.Generic;
+
 namespace HotelGenericoApi.Models;
 
-public class HabitacionAmenidad
+public partial class HabitacionAmenidad
 {
     public int IdHabitacionAmenidad { get; set; }
+
     public int IdHabitacion { get; set; }
+
     public int IdProducto { get; set; }
+
     public int CantidadBase { get; set; }
 
-    // Navegación
-    public Habitacion? Habitacion { get; set; }
-    public Producto? Producto { get; set; }
+    public virtual Habitacion IdHabitacionNavigation { get; set; } = null!;
+
+    public virtual Producto IdProductoNavigation { get; set; } = null!;
 }

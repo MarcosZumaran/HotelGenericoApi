@@ -1,8 +1,17 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class EstadoSunat
+namespace HotelGenericoApi.Models;
+
+public partial class EstadoSunat
 {
     public int Codigo { get; set; }
+
     public string Descripcion { get; set; } = null!;
+
     public string? DescripcionLarga { get; set; }
+
+    public virtual ICollection<CierreCajaEnvio> CierreCajaEnvios { get; set; } = new List<CierreCajaEnvio>();
+
+    public virtual ICollection<Comprobante> Comprobantes { get; set; } = new List<Comprobante>();
 }

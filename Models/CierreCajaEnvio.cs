@@ -1,13 +1,19 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class CierreCajaEnvio
+namespace HotelGenericoApi.Models;
+
+public partial class CierreCajaEnvio
 {
     public DateOnly Fecha { get; set; }
+
     public int IdEstadoSunat { get; set; }
+
     public DateTime? FechaEnvio { get; set; }
-    public int? IntentosEnvio { get; set; }
+
+    public int IntentosEnvio { get; set; }
+
     public string? HashXml { get; set; }
 
-    // Navegación
-    public EstadoSunat? EstadoSunat { get; set; }
+    public virtual EstadoSunat IdEstadoSunatNavigation { get; set; } = null!;
 }
