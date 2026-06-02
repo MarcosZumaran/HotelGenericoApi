@@ -1,9 +1,17 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class CategoriaProducto
+namespace HotelGenericoApi.Models;
+
+public partial class CategoriaProducto
 {
     public int IdCategoria { get; set; }
+
     public string Nombre { get; set; } = null!;
+
     public string? Descripcion { get; set; }
-    public bool MostrarEnVentas { get; set; } = true;
+
+    public bool MostrarEnVentas { get; set; }
+
+    public virtual ICollection<Producto> Productos { get; set; } = new List<Producto>();
 }

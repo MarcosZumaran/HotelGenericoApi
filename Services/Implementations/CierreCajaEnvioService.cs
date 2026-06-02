@@ -22,7 +22,7 @@ namespace HotelGenericoApi.Services.Implementations
         public async Task<CierreCajaEnvioDto> GetEstadoAsync(DateOnly fecha)
         {
             var envio = await _db.CierresCajaEnvio
-                .Include(e => e.EstadoSunat)
+                .Include(e => e.IdEstadoSunatNavigation)
                 .FirstOrDefaultAsync(e => e.Fecha == fecha);
 
             if (envio == null)
@@ -33,7 +33,7 @@ namespace HotelGenericoApi.Services.Implementations
             return new CierreCajaEnvioDto(
                 envio.Fecha,
                 envio.IdEstadoSunat,
-                envio.EstadoSunat?.Descripcion ?? "Desconocido",
+                envio.IdEstadoSunatNavigation?.Descripcion ?? "Desconocido",
                 envio.FechaEnvio,
                 envio.IntentosEnvio
             );
@@ -59,7 +59,7 @@ namespace HotelGenericoApi.Services.Implementations
             {
                 envio.IdEstadoSunat = 2;
                 envio.FechaEnvio = DateTime.UtcNow;
-                envio.IntentosEnvio = (envio.IntentosEnvio ?? 0) + 1;
+                envio.IntentosEnvio = envio.IntentosEnvio + 1;
                 envio.HashXml = "hash_simulado";
             }
 

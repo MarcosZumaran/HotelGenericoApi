@@ -22,31 +22,31 @@ public class VentaService : IVentaService
     public async Task<List<VentaResponseDto>> GetAllAsync()
     {
         return await _db.Ventas
-            .Include(v => v.Cliente)
+            .Include(v => v.IdClienteNavigation)
             .Include(v => v.MetodoPagoNavigation)
-            .Include(v => v.ItemsVenta!).ThenInclude(i => i.Producto)
+            .Include(v => v.ItemVenta).ThenInclude(i => i.IdProductoNavigation)
             .AsNoTracking()
             .OrderByDescending(v => v.FechaVenta)
             .Select(v => new VentaResponseDto
             {
                 IdVenta = v.IdVenta,
                 IdCliente = v.IdCliente,
-                ClienteNombre = v.Cliente != null
-                    ? $"{v.Cliente.Nombres} {v.Cliente.Apellidos}"
+                ClienteNombre = v.IdClienteNavigation != null
+                    ? $"{v.IdClienteNavigation.Nombres} {v.IdClienteNavigation.Apellidos}"
                     : null,
-                FechaVenta = (DateTime)v.FechaVenta,
+                FechaVenta = v.FechaVenta,
                 Total = v.Total,
                 MetodoPago = v.MetodoPagoNavigation != null
                     ? v.MetodoPagoNavigation.Descripcion
                     : v.MetodoPago,
-                Items = v.ItemsVenta!.Select(i => new ItemVentaResponseDto
+                Items = v.ItemVenta.Select(i => new ItemVentaResponseDto
                 {
                     IdItem = i.IdItem,
                     IdProducto = i.IdProducto,
-                    NombreProducto = i.Producto != null ? i.Producto.Nombre : null,
+                    NombreProducto = i.IdProductoNavigation != null ? i.IdProductoNavigation.Nombre : null,
                     Cantidad = i.Cantidad,
                     PrecioUnitario = i.PrecioUnitario,
-                    Subtotal = i.Subtotal
+                    Subtotal = i.Subtotal.GetValueOrDefault()
                 }).ToList()
             })
             .ToListAsync();
@@ -55,9 +55,9 @@ public class VentaService : IVentaService
     public async Task<VentaResponseDto?> GetByIdAsync(int id)
     {
         var venta = await _db.Ventas
-            .Include(v => v.Cliente)
+            .Include(v => v.IdClienteNavigation)
             .Include(v => v.MetodoPagoNavigation)
-            .Include(v => v.ItemsVenta!).ThenInclude(i => i.Producto)
+            .Include(v => v.ItemVenta).ThenInclude(i => i.IdProductoNavigation)
             .FirstOrDefaultAsync(v => v.IdVenta == id);
 
         if (venta == null) return null;
@@ -66,22 +66,22 @@ public class VentaService : IVentaService
         {
             IdVenta = venta.IdVenta,
             IdCliente = venta.IdCliente,
-            ClienteNombre = venta.Cliente != null
-                ? $"{venta.Cliente.Nombres} {venta.Cliente.Apellidos}"
+            ClienteNombre = venta.IdClienteNavigation != null
+                ? $"{venta.IdClienteNavigation.Nombres} {venta.IdClienteNavigation.Apellidos}"
                 : null,
-            FechaVenta = (DateTime)venta.FechaVenta,
+            FechaVenta = venta.FechaVenta,
             Total = venta.Total,
             MetodoPago = venta.MetodoPagoNavigation != null
                 ? venta.MetodoPagoNavigation.Descripcion
                 : venta.MetodoPago,
-            Items = venta.ItemsVenta!.Select(i => new ItemVentaResponseDto
+            Items = venta.ItemVenta.Select(i => new ItemVentaResponseDto
             {
                 IdItem = i.IdItem,
                 IdProducto = i.IdProducto,
-                NombreProducto = i.Producto != null ? i.Producto.Nombre : null,
+                NombreProducto = i.IdProductoNavigation != null ? i.IdProductoNavigation.Nombre : null,
                 Cantidad = i.Cantidad,
                 PrecioUnitario = i.PrecioUnitario,
-                Subtotal = i.Subtotal
+                Subtotal = i.Subtotal.GetValueOrDefault()
             }).ToList()
         };
     }
@@ -93,7 +93,7 @@ public class VentaService : IVentaService
         {
             // Calcular total y validar stock
             decimal total = 0;
-            var items = new List<ItemVenta>();
+            var items = new List<ItemVentum>();
 
             foreach (var itemDto in dto.Items)
             {
@@ -106,7 +106,7 @@ public class VentaService : IVentaService
                 // Descontar stock
                 producto.Stock -= itemDto.Cantidad;
 
-                var item = new ItemVenta
+                var item = new ItemVentum
                 {
                     IdProducto = itemDto.IdProducto,
                     Cantidad = itemDto.Cantidad,
@@ -123,14 +123,14 @@ public class VentaService : IVentaService
                 cliente = await _db.Clientes.FindAsync(dto.IdCliente.Value);
             }
 
-            var venta = new Venta
+            var venta = new Ventum
             {
                 IdCliente = dto.IdCliente,
                 IdUsuario = idUsuario,
                 FechaVenta = DateTime.UtcNow,
                 Total = total,
                 MetodoPago = dto.MetodoPago,
-                ItemsVenta = items
+                ItemVenta = items
             };
 
             _db.Ventas.Add(venta);
@@ -175,14 +175,14 @@ public class VentaService : IVentaService
     public async Task<bool> DeleteAsync(int id)
     {
         var venta = await _db.Ventas
-            .Include(v => v.ItemsVenta)
+            .Include(v => v.ItemVenta)
             .FirstOrDefaultAsync(v => v.IdVenta == id);
 
         if (venta == null) return false;
 
-        if (venta.ItemsVenta != null)
+        if (venta.ItemVenta != null)
         {
-            foreach (var item in venta.ItemsVenta)
+            foreach (var item in venta.ItemVenta)
             {
                 var producto = await _db.Productos.FindAsync(item.IdProducto);
                 if (producto != null)

@@ -10,7 +10,7 @@ using HotelGenericoApi.Services.Interfaces;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 [EnableRateLimiting("authenticated")]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -147,5 +147,40 @@ public class HabitacionController : ControllerBase
         if (!result)
             return NotFound();
         return NoContent();
+    }
+
+    /// <summary>Obtiene las amenidades personalizadas de una habitación.</summary>
+    [HttpGet("{id}/amenidades")]
+    public async Task<IActionResult> GetAmenidades(int id)
+    {
+        var amenidades = await _habitacionService.GetAmenidadesPorHabitacionAsync(id);
+        var dto = amenidades.Select(a => new { a.IdProducto, a.CantidadBase, a.Producto?.Nombre });
+        return Ok(dto);
+    }
+
+    /// <summary>Actualiza las amenidades personalizadas de una habitación.</summary>
+    [HttpPut("{id}/amenidades")]
+    public async Task<IActionResult> UpdateAmenidades(int id, [FromBody] List<HabitacionAmenidadDto> dto)
+    {
+        var result = await _habitacionService.ActualizarAmenidadesAsync(id, dto);
+        if (!result) return NotFound();
+        return Ok();
+    }
+
+    /// <summary>Obtiene las características extra de una habitación.</summary>
+    [HttpGet("{id}/caracteristicas")]
+    public async Task<IActionResult> GetCaracteristicas(int id)
+    {
+        var caracteristicas = await _habitacionService.GetCaracteristicasAsync(id);
+        return Ok(caracteristicas ?? new Dictionary<string, bool>());
+    }
+
+    /// <summary>Actualiza las características extra de una habitación.</summary>
+    [HttpPut("{id}/caracteristicas")]
+    public async Task<IActionResult> UpdateCaracteristicas(int id, [FromBody] Dictionary<string, bool> caracteristicas)
+    {
+        var result = await _habitacionService.ActualizarCaracteristicasAsync(id, caracteristicas);
+        if (!result) return NotFound();
+        return Ok();
     }
 }

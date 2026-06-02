@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using HotelGenericoApi.Constants;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
@@ -23,14 +24,35 @@ public class AmenidadService : IAmenidadService
     /// </summary>
     public async Task InicializarStockHabitacionAsync(int idHabitacion)
     {
-        var amenidades = await _db.Productos
-            .Where(p => p.EsAmenidad && p.StockPorHabitacion.HasValue && p.StockPorHabitacion > 0)
+        // Primero, obtener las amenidades personalizadas de la habitación
+        var amenidadesPersonalizadas = await _db.HabitacionAmenidades
+            .Include(ha => ha.IdProductoNavigation)
+            .Where(ha => ha.IdHabitacion == idHabitacion)
             .ToListAsync();
 
-        foreach (var producto in amenidades)
+        List<Producto> productosAInicializar;
+
+        if (amenidadesPersonalizadas.Any())
+        {
+            // Usar las amenidades personalizadas
+            productosAInicializar = amenidadesPersonalizadas.Select(ha => ha.IdProductoNavigation!).ToList();
+        }
+        else
+        {
+            // Usar las amenidades globales (todas con es_amenidad = true y stock_por_habitacion > 0)
+            productosAInicializar = await _db.Productos
+                .Where(p => p.EsAmenidad && p.StockPorHabitacion.HasValue && p.StockPorHabitacion > 0)
+                .ToListAsync();
+        }
+
+        foreach (var producto in productosAInicializar)
         {
             var stockActual = await _db.StockHabitaciones
                 .FirstOrDefaultAsync(s => s.IdHabitacion == idHabitacion && s.IdProducto == producto.IdProducto);
+
+            var cantidadBase = amenidadesPersonalizadas
+                .FirstOrDefault(ha => ha.IdProducto == producto.IdProducto)?.CantidadBase
+                ?? producto.StockPorHabitacion ?? 0;
 
             if (stockActual == null)
             {
@@ -38,12 +60,12 @@ public class AmenidadService : IAmenidadService
                 {
                     IdHabitacion = idHabitacion,
                     IdProducto = producto.IdProducto,
-                    CantidadActual = producto.StockPorHabitacion!.Value
+                    CantidadActual = cantidadBase
                 });
             }
             else
             {
-                stockActual.CantidadActual = producto.StockPorHabitacion!.Value;
+                stockActual.CantidadActual = cantidadBase;
             }
         }
 
@@ -90,7 +112,7 @@ public class AmenidadService : IAmenidadService
     public async Task<StockHabitacionDto?> ConsumirAmenidadAsync(int idHabitacion, ConsumirAmenidadDto dto)
     {
         var stock = await _db.StockHabitaciones
-            .Include(s => s.Producto)
+            .Include(s => s.IdProductoNavigation)
             .FirstOrDefaultAsync(s => s.IdHabitacion == idHabitacion && s.IdProducto == dto.ProductoId);
 
         if (stock == null)
@@ -107,7 +129,7 @@ public class AmenidadService : IAmenidadService
         if (dto.EsCargableAlHuésped)
         {
             var estanciaActiva = await _db.Estancias
-                .FirstOrDefaultAsync(e => e.IdHabitacion == idHabitacion && e.Estado == "Activa" && e.FechaCheckoutReal == null);
+                .FirstOrDefaultAsync(e => e.IdHabitacion == idHabitacion && e.Estado == EstadoEstanciaCodigo.Code.Activa && e.FechaCheckoutReal == null);
 
             if (estanciaActiva == null)
                 throw new InvalidOperationException("No hay una estancia activa para esta habitación.");
@@ -140,7 +162,7 @@ public class AmenidadService : IAmenidadService
     public async Task<List<StockHabitacionDto>> GetStockHabitacionAsync(int idHabitacion)
     {
         var stock = await _db.StockHabitaciones
-            .Include(s => s.Producto)
+            .Include(s => s.IdProductoNavigation)
             .Where(s => s.IdHabitacion == idHabitacion)
             .Select(s => new StockHabitacionDto
             {

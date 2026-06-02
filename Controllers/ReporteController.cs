@@ -8,7 +8,7 @@ using HotelGenericoApi.Services.Interfaces;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 [EnableRateLimiting("authenticated")]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]

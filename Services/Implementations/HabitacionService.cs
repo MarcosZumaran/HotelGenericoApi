@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.SignalR;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Response;
+using HotelGenericoApi.DTOs.Request;
+using HotelGenericoApi.Constants;
 using HotelGenericoApi.Hubs;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Interfaces;
@@ -27,8 +29,8 @@ public class HabitacionService : IHabitacionService
     public async Task<List<Habitacion>> GetAllAsync()
     {
         return await _db.Habitaciones
-            .Include(h => h.Tipo)
-            .Include(h => h.Estado)
+            .Include(h => h.IdTipoNavigation)
+            .Include(h => h.IdEstadoNavigation)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -36,13 +38,16 @@ public class HabitacionService : IHabitacionService
     public async Task<Habitacion?> GetByIdAsync(int id)
     {
         return await _db.Habitaciones
-            .Include(h => h.Tipo)
-            .Include(h => h.Estado)
+            .Include(h => h.IdTipoNavigation)
+            .Include(h => h.IdEstadoNavigation)
+            .Include(h => h.HabitacionAmenidades)
+                .ThenInclude(ha => ha.IdProductoNavigation)
             .FirstOrDefaultAsync(h => h.IdHabitacion == id);
     }
 
     public async Task<Habitacion> CreateAsync(Habitacion habitacion)
     {
+        // Si la habitación viene con amenidades, se deben guardar después
         _db.Habitaciones.Add(habitacion);
         await _db.SaveChangesAsync();
         _logger.LogInformation("Habitación {Numero} creada", habitacion.NumeroHabitacion);
@@ -51,14 +56,26 @@ public class HabitacionService : IHabitacionService
 
     public async Task<Habitacion?> UpdateAsync(int id, Habitacion habitacionActualizada)
     {
-        var existente = await _db.Habitaciones.FindAsync(id);
+        var existente = await _db.Habitaciones
+            .Include(h => h.HabitacionAmenidades)
+            .FirstOrDefaultAsync(h => h.IdHabitacion == id);
         if (existente == null) return null;
 
-        _db.Entry(existente).CurrentValues.SetValues(habitacionActualizada);
+        // Actualizar propiedades básicas
+        existente.NumeroHabitacion = habitacionActualizada.NumeroHabitacion;
+        existente.Piso = habitacionActualizada.Piso;
+        existente.Descripcion = habitacionActualizada.Descripcion;
+        existente.IdTipo = habitacionActualizada.IdTipo;
+        existente.PrecioNoche = habitacionActualizada.PrecioNoche;
+        existente.IdEstado = habitacionActualizada.IdEstado;
+        existente.Caracteristicas = habitacionActualizada.Caracteristicas;
+
+        // Las amenidades se actualizan aparte con el método específico
         await _db.SaveChangesAsync();
         _logger.LogInformation("Habitación {Numero} actualizada", existente.NumeroHabitacion);
         return existente;
     }
+
 
     public async Task<bool> DeleteAsync(int id)
     {
@@ -74,7 +91,7 @@ public class HabitacionService : IHabitacionService
     public async Task<bool> CambiarEstadoAsync(int idHabitacion, int idNuevoEstado, int idUsuario, string? observacion = null)
     {
         var habitacion = await _db.Habitaciones
-            .Include(h => h.Estado)
+            .Include(h => h.IdEstadoNavigation)
             .FirstOrDefaultAsync(h => h.IdHabitacion == idHabitacion);
 
         if (habitacion == null) return false;
@@ -146,11 +163,11 @@ public class HabitacionService : IHabitacionService
         var hoy = DateTime.UtcNow.Date;
 
         var habitaciones = await _db.Habitaciones
-            .Include(h => h.Tipo)
-            .Include(h => h.Estado)
+            .Include(h => h.IdTipoNavigation)
+            .Include(h => h.IdEstadoNavigation)
             .Include(h => h.Estancias.Where(e => e.FechaCheckoutReal == null))
-                .ThenInclude(e => e.ClienteTitular)
-            .Include(h => h.Reservas.Where(r => r.Estado == "Confirmada" && r.FechaEntradaPrevista.Date == hoy))
+                .ThenInclude(e => e.IdClienteTitularNavigation)
+            .Include(h => h.Reservas.Where(r => r.Estado == EstadoReservaCodigo.Code.Confirmada && r.FechaEntradaPrevista.Date == hoy))
             .AsNoTracking()
             .ToListAsync();
 
@@ -166,11 +183,11 @@ public class HabitacionService : IHabitacionService
 
             foreach (var t in transiciones.Where(t => t.IdEstadoActual == h.IdEstado))
             {
-                if (t.IdEstadoSiguiente == 2) acciones.Add("CheckIn");
-                else if (t.IdEstadoActual == 2 && t.IdEstadoSiguiente == 3) acciones.Add("CheckOut");
-                else if (t.IdEstadoSiguiente == 4) acciones.Add("Mantenimiento");
-                else if (t.IdEstadoSiguiente == 1) acciones.Add("Habilitar");
-                else if (t.IdEstadoSiguiente == 5) acciones.Add("Reservar");
+                if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Ocupada) acciones.Add("CheckIn");
+                else if (t.IdEstadoActual == EstadoHabitacionCodigo.Ocupada && t.IdEstadoSiguiente == EstadoHabitacionCodigo.Limpieza) acciones.Add("CheckOut");
+                else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Mantenimiento) acciones.Add("Mantenimiento");
+                else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Disponible) acciones.Add("Habilitar");
+                else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Bloqueado) acciones.Add("Reservar");
             }
 
             // CancelarReserva
@@ -184,7 +201,7 @@ public class HabitacionService : IHabitacionService
                 NombreTipo: h.Tipo?.Nombre ?? "",
                 PrecioNoche: h.PrecioNoche,
                 IdEstado: h.IdEstado,
-                NombreEstado: h.Estado?.Nombre ?? "",
+                NombreEstado: h.Estado ?? "",
                 Descripcion: h.Descripcion,
                 IdEstanciaActiva: estanciaActiva?.IdEstancia,
                 ClienteHuesped: estanciaActiva?.ClienteTitular != null
@@ -202,12 +219,12 @@ public class HabitacionService : IHabitacionService
     {
         var todas = await GetEstadoActualAsync();
         var idsOcupadas = await _db.Reservas
-            .Where(r => r.Estado != "Cancelada" &&
+            .Where(r => r.Estado != EstadoReservaCodigo.Code.Cancelada &&
                         r.FechaEntradaPrevista < fechaSalida &&
                         r.FechaSalidaPrevista > fechaEntrada)
             .Select(r => r.IdHabitacion)
             .Union(_db.Estancias
-                .Where(e => e.Estado == "Activa" &&
+                .Where(e => e.Estado == EstadoEstanciaCodigo.Code.Activa &&
                             e.FechaCheckin < fechaSalida &&
                             e.FechaCheckoutPrevista > fechaEntrada)
                 .Select(e => e.IdHabitacion))
@@ -215,4 +232,48 @@ public class HabitacionService : IHabitacionService
 
         return todas.Where(h => !idsOcupadas.Contains(h.IdHabitacion)).ToList();
     }
+
+    public async Task<List<HabitacionAmenidad>> GetAmenidadesPorHabitacionAsync(int idHabitacion)
+    {
+        return await _db.HabitacionAmenidades
+            .Include(ha => ha.IdProductoNavigation)
+            .Where(ha => ha.IdHabitacion == idHabitacion)
+            .ToListAsync();
+    }
+
+    public async Task<bool> ActualizarAmenidadesAsync(int idHabitacion, List<HabitacionAmenidadDto> amenidades)
+    {
+        var existentes = await _db.HabitacionAmenidades
+            .Where(ha => ha.IdHabitacion == idHabitacion)
+            .ToListAsync();
+        _db.HabitacionAmenidades.RemoveRange(existentes);
+
+        var nuevas = amenidades.Select(a => new HabitacionAmenidad
+        {
+            IdHabitacion = idHabitacion,
+            IdProducto = a.IdProducto,
+            CantidadBase = a.CantidadBase
+        });
+        _db.HabitacionAmenidades.AddRange(nuevas);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<Dictionary<string, bool>?> GetCaracteristicasAsync(int idHabitacion)
+    {
+        var hab = await _db.Habitaciones.FindAsync(idHabitacion);
+        if (hab == null || string.IsNullOrEmpty(hab.Caracteristicas))
+            return null;
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, bool>>(hab.Caracteristicas);
+    }
+
+    public async Task<bool> ActualizarCaracteristicasAsync(int idHabitacion, Dictionary<string, bool> caracteristicas)
+    {
+        var hab = await _db.Habitaciones.FindAsync(idHabitacion);
+        if (hab == null) return false;
+        hab.Caracteristicas = System.Text.Json.JsonSerializer.Serialize(caracteristicas);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
 }

@@ -8,7 +8,7 @@ using System.Security.Claims;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 public class UsuarioController : ControllerBase

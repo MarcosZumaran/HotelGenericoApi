@@ -1,10 +1,17 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class VEstadoHabitacion
+namespace HotelGenericoApi.Models;
+
+public partial class VEstadoHabitacion
 {
-    public string? NumeroHabitacion { get; set; }
-    public string? TipoHabitacion { get; set; }
-    public string? Estado { get; set; }
+    public string NumeroHabitacion { get; set; } = null!;
+
+    public string TipoHabitacion { get; set; } = null!;
+
+    public string Estado { get; set; } = null!;
+
     public decimal PrecioNoche { get; set; }
-    public DateTime? FechaUltimoCambio { get; set; }
+
+    public DateTime FechaUltimoCambio { get; set; }
 }

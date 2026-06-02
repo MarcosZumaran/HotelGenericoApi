@@ -6,7 +6,7 @@ using HotelGenericoApi.Services.Interfaces;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 public class AmenidadController : ControllerBase
 {

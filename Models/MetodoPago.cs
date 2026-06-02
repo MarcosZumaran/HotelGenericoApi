@@ -1,7 +1,15 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class MetodoPago
+namespace HotelGenericoApi.Models;
+
+public partial class MetodoPago
 {
-    public string Codigo { get; set; } = null!; // char(3)
+    public string Codigo { get; set; } = null!;
+
     public string Descripcion { get; set; } = null!;
+
+    public virtual ICollection<Comprobante> Comprobantes { get; set; } = new List<Comprobante>();
+
+    public virtual ICollection<Ventum> Venta { get; set; } = new List<Ventum>();
 }

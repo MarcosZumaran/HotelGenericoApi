@@ -7,24 +7,24 @@ using HotelGenericoApi.Services.Interfaces;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 [EnableRateLimiting("authenticated")]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 public class ReservaController : ControllerBase
 {
-    private readonly IReservaService _reservaService;
+    private readonly IReservaQueryService _reservaQueryService;
 
-    public ReservaController(IReservaService reservaService)
+    public ReservaController(IReservaQueryService reservaQueryService)
     {
-        _reservaService = reservaService;
+        _reservaQueryService = reservaQueryService;
     }
 
     [HttpGet]
     [ProducesResponseType(typeof(List<ReservaResponseDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ReservaResponseDto>>> GetAll()
     {
-        var reservas = await _reservaService.GetAllAsync();
+        var reservas = await _reservaQueryService.GetAllAsync();
         return Ok(reservas);
     }
 }

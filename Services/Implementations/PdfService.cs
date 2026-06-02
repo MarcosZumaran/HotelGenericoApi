@@ -26,11 +26,11 @@ public class PdfService : IPdfService
 
         string? numeroHabitacion = null;
         string? fechasHospedaje = null;
-        List<Models.ItemVenta>? itemsVenta = null;
+        List<ItemVentum>? itemsVenta = null;
 
         if (comp.IdEstancia.HasValue)
         {
-            var estancia = await _db.Estancias.Include(e => e.Habitacion).FirstOrDefaultAsync(e => e.IdEstancia == comp.IdEstancia.Value);
+            var estancia = await _db.Estancias.Include(e => e.IdHabitacionNavigation).FirstOrDefaultAsync(e => e.IdEstancia == comp.IdEstancia.Value);
             if (estancia != null)
             {
                 numeroHabitacion = estancia.Habitacion?.NumeroHabitacion;
@@ -40,8 +40,8 @@ public class PdfService : IPdfService
 
         if (comp.IdVenta.HasValue)
         {
-            var venta = await _db.Ventas.Include(v => v.ItemsVenta).ThenInclude(i => i.Producto).FirstOrDefaultAsync(v => v.IdVenta == comp.IdVenta.Value);
-            itemsVenta = venta?.ItemsVenta.ToList();
+            var venta = await _db.Ventas.Include(v => v.ItemVenta).ThenInclude(i => i.IdProductoNavigation).FirstOrDefaultAsync(v => v.IdVenta == comp.IdVenta.Value);
+            itemsVenta = venta?.ItemVenta.ToList();
         }
 
         return await GenerarPdfComprobanteAsync(comp, numeroHabitacion, fechasHospedaje, itemsVenta);
@@ -57,8 +57,8 @@ public class PdfService : IPdfService
     public async Task<byte[]> GenerarPdfEstanciaAsync(int idEstancia)
     {
         var estancia = await _db.Estancias
-            .Include(e => e.Habitacion)
-            .Include(e => e.ClienteTitular)
+            .Include(e => e.IdHabitacionNavigation)
+            .Include(e => e.IdClienteTitularNavigation)
             .FirstOrDefaultAsync(e => e.IdEstancia == idEstancia);
 
         if (estancia == null)
@@ -98,7 +98,7 @@ public class PdfService : IPdfService
     }
 
     // --- Lógica de generación de PDF con QuestPDF ---
-    private async Task<byte[]> GenerarPdfComprobanteAsync(Models.Comprobante comp, string? numeroHabitacion, string? fechasHospedaje, List<Models.ItemVenta>? itemsVenta)
+    private async Task<byte[]> GenerarPdfComprobanteAsync(Models.Comprobante comp, string? numeroHabitacion, string? fechasHospedaje, List<ItemVentum>? itemsVenta)
     {
         string tipo = comp.TipoComprobante == "03" ? "BOLETA DE VENTA" : "FACTURA";
         string cliente = comp.ClienteNombre ?? "CLIENTE ANÓNIMO";
@@ -195,7 +195,7 @@ public class PdfService : IPdfService
             .Where(v => v.Fecha == fecha)
             .ToListAsync();
 
-        decimal totalGeneral = datos.Sum(d => d.Ingresos);
+        decimal totalGeneral = datos.Sum(d => d.Ingresos.GetValueOrDefault());
 
         var document = Document.Create(container =>
         {

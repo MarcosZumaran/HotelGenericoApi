@@ -10,41 +10,60 @@ using HotelGenericoApi.Services.Interfaces;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize]
 [EnableRateLimiting("authenticated")]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 public class EstanciaController : ControllerBase
 {
-    private readonly IEstanciaService _estanciaService;
+    private readonly IEstanciaQueryService _queryService;
+    private readonly ICheckinService _checkinService;
+    private readonly ICheckoutService _checkoutService;
+    private readonly ISalidaTemporalService _salidaTemporalService;
+    private readonly IHuespedService _huespedService;
+    private readonly IConsumoEstanciaService _consumoService;
+    private readonly ITrasladoHabitacionService _trasladoService;
+    private readonly IReservaCommandService _reservaCommandService;
 
-    public EstanciaController(IEstanciaService estanciaService)
+    public EstanciaController(
+        IEstanciaQueryService queryService,
+        ICheckinService checkinService,
+        ICheckoutService checkoutService,
+        ISalidaTemporalService salidaTemporalService,
+        IHuespedService huespedService,
+        IConsumoEstanciaService consumoService,
+        ITrasladoHabitacionService trasladoService,
+        IReservaCommandService reservaCommandService)
     {
-        _estanciaService = estanciaService;
+        _queryService = queryService;
+        _checkinService = checkinService;
+        _checkoutService = checkoutService;
+        _salidaTemporalService = salidaTemporalService;
+        _huespedService = huespedService;
+        _consumoService = consumoService;
+        _trasladoService = trasladoService;
+        _reservaCommandService = reservaCommandService;
     }
 
-    /// <summary>Obtiene todas las estancias registradas.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<Estancia>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<Estancia>>> GetAll()
     {
-        var estancias = await _estanciaService.GetAllAsync();
+        var estancias = await _queryService.GetAllAsync();
         return Ok(estancias);
     }
 
-    /// <summary>Obtiene una estancia por su ID con detalles completos.</summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(Estancia), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<Estancia>> GetById(int id)
     {
-        var estancia = await _estanciaService.GetByIdAsync(id);
+        var estancia = await _queryService.GetByIdAsync(id);
         if (estancia == null)
             return NotFound();
         return Ok(estancia);
     }
 
-    /// <summary>Realiza check-in creando una estancia y ocupando la habitación.</summary>
     [HttpPost("checkin")]
     [ProducesResponseType(typeof(Estancia), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -54,11 +73,10 @@ public class EstanciaController : ControllerBase
         if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        var result = await _estanciaService.CheckinAsync(dto, userId);
+        var result = await _checkinService.CheckinAsync(dto, userId);
         return CreatedAtAction(nameof(GetById), new { id = result.IdEstancia }, result);
     }
 
-    /// <summary>Realiza checkout (suma consumos, genera comprobante y libera habitación).</summary>
     [HttpPost("{id}/checkout")]
     [ProducesResponseType(typeof(CheckoutResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -70,7 +88,7 @@ public class EstanciaController : ControllerBase
 
         try
         {
-            var result = await _estanciaService.RealizarCheckoutAsync(id, userId);
+            var result = await _checkoutService.RealizarCheckoutAsync(id, userId);
             return Ok(result);
         }
         catch (Exception ex)
@@ -79,7 +97,6 @@ public class EstanciaController : ControllerBase
         }
     }
 
-    /// <summary>Registra la salida temporal de un huésped (deja la habitación pero no hace checkout).</summary>
     [HttpPost("{id}/salida-temporal")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -87,7 +104,7 @@ public class EstanciaController : ControllerBase
     {
         try
         {
-            await _estanciaService.RegistrarSalidaTemporalAsync(id, dto.LlavesDejadas);
+            await _salidaTemporalService.RegistrarSalidaTemporalAsync(id, dto.LlavesDejadas);
             return Ok(new { message = "Salida temporal registrada" });
         }
         catch (Exception ex)
@@ -96,7 +113,6 @@ public class EstanciaController : ControllerBase
         }
     }
 
-    /// <summary>Registra el regreso de un huésped que estaba fuera temporalmente.</summary>
     [HttpPost("{id}/regreso")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -104,7 +120,7 @@ public class EstanciaController : ControllerBase
     {
         try
         {
-            await _estanciaService.RegistrarRegresoAsync(id);
+            await _salidaTemporalService.RegistrarRegresoAsync(id);
             return Ok(new { message = "Regreso registrado" });
         }
         catch (Exception ex)
@@ -113,7 +129,6 @@ public class EstanciaController : ControllerBase
         }
     }
 
-    /// <summary>Agrega un huésped adicional a una estancia (crea el cliente si no existe).</summary>
     [HttpPost("{id}/huespedes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -121,7 +136,7 @@ public class EstanciaController : ControllerBase
     {
         try
         {
-            var huesped = await _estanciaService.AgregarHuespedCompletoAsync(id, dto);
+            var huesped = await _huespedService.AgregarHuespedCompletoAsync(id, dto);
             return Ok(new { idHuesped = huesped.IdHuesped, message = "Huésped agregado" });
         }
         catch (Exception ex)
@@ -130,61 +145,76 @@ public class EstanciaController : ControllerBase
         }
     }
 
-    /// <summary>Registra un consumo (producto) en una estancia activa.</summary>
     [HttpPost("{idEstancia}/consumo")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> AddConsumo(int idEstancia, [FromBody] ItemEstancia item)
     {
-        var result = await _estanciaService.AddConsumoAsync(idEstancia, item);
+        var result = await _consumoService.AddConsumoAsync(idEstancia, item);
         if (!result)
             return BadRequest();
         return Ok();
     }
 
-    /// <summary>Obtiene los consumos de una estancia.</summary>
     [HttpGet("{id}/consumos")]
     [ProducesResponseType(typeof(List<ItemConsumoResponseDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ItemConsumoResponseDto>>> GetConsumos(int id)
     {
-        var result = await _estanciaService.GetConsumosAsync(id);
+        var result = await _queryService.GetConsumosAsync(id);
         return Ok(result);
     }
 
-    /// <summary>Actualiza un consumo en una estancia.</summary>
     [HttpPut("{id}/consumo/{idItem}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> UpdateConsumo(int id, int idItem, [FromBody] ActualizarConsumoDto dto)
     {
-        var result = await _estanciaService.UpdateConsumoAsync(idItem, dto.Cantidad);
+        var result = await _consumoService.UpdateConsumoAsync(idItem, dto.Cantidad);
         if (!result)
             return NotFound();
         return Ok();
     }
 
-    /// <summary>Elimina un consumo de una estancia.</summary>
     [HttpDelete("{id}/consumo/{idItem}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteConsumo(int id, int idItem)
     {
-        var result = await _estanciaService.DeleteConsumoAsync(idItem);
+        var result = await _consumoService.DeleteConsumoAsync(idItem);
         if (!result)
             return NotFound();
         return Ok();
     }
 
-    /// <summary>Obtiene las reservas de una habitación.</summary>
+    [HttpPost("{id}/trasladar")]
+    [ProducesResponseType(typeof(TrasladoResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> TrasladarHabitacion(int id, [FromBody] TrasladarEstanciaDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        try
+        {
+            var result = await _trasladoService.TrasladarHabitacionAsync(id, dto, userId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpGet("reservas/{idHabitacion}")]
     [ProducesResponseType(typeof(List<ReservaResponseDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ReservaResponseDto>>> GetReservasByHabitacion(int idHabitacion)
     {
-        var result = await _estanciaService.GetReservasByHabitacionAsync(idHabitacion);
+        var result = await _queryService.GetReservasByHabitacionAsync(idHabitacion);
         return Ok(result);
     }
 
-    /// <summary>Crea una nueva reserva.</summary>
     [HttpPost("reserva")]
     [ProducesResponseType(typeof(Reserva), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -194,17 +224,16 @@ public class EstanciaController : ControllerBase
         if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        var result = await _estanciaService.CreateReservaAsync(dto, userId);
+        var result = await _reservaCommandService.CreateReservaAsync(dto, userId);
         return CreatedAtAction(nameof(GetById), new { id = result.IdReserva }, result);
     }
 
-    /// <summary>Cancela una reserva existente.</summary>
     [HttpPut("reserva/{id}/cancelar")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> CancelarReserva(int id)
     {
-        var result = await _estanciaService.CancelarReservaAsync(id);
+        var result = await _reservaCommandService.CancelarReservaAsync(id);
         if (!result)
             return NotFound();
         return Ok();

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace HotelGenericoApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 [Authorize(Roles = "Administrador")]
 public class CatTipoComprobanteController : ControllerBase
 {

@@ -185,7 +185,7 @@ if (app.Environment.IsProduction())
 app.UseMiddleware<HotelGenericoApi.Middleware.ExceptionMiddleware>();
 
 // Seed de usuarios por defecto en desarrollo
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var setupService = scope.ServiceProvider.GetRequiredService<SetupService>();

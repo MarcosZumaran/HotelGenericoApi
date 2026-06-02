@@ -112,7 +112,7 @@ public class ClienteService : IClienteService
                 c.Telefono,
                 c.Email,
                 c.Direccion,
-                c.FechaRegistro ?? DateTime.UtcNow,
+                c.FechaRegistro,
                 c.FechaVerificacionReniec
             ))
             .ToListAsync();
