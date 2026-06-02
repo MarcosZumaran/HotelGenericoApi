@@ -1,29 +1,66 @@
-﻿namespace HotelGenericoApi.Models;
+using System;
+using System.Collections.Generic;
 
-public class Estancia
+namespace HotelGenericoApi.Models;
+
+public partial class Estancia
 {
     public int IdEstancia { get; set; }
+
     public int? IdReserva { get; set; }
-    public int IdHabitacion { get; set; }
-    public int IdClienteTitular { get; set; }
-    public DateTime FechaCheckin { get; set; }
-    public DateTime FechaCheckoutPrevista { get; set; }
-    public DateTime? FechaCheckoutReal { get; set; }
-    public decimal MontoTotal { get; set; }
-    public string? Estado { get; set; }
-    public DateTime? CreatedAt { get; set; }
 
-    public bool EstaFuera { get; set; } = false;
-    public DateTime? HoraSalidaTemporal { get; set; }
-    public DateTime? HoraRegresoTemporal { get; set; }
-    public bool? LlavesDejadas { get; set; } // null = nunca salió, true=dejó, false=no dejó
     public int? IdReservaCorporativa { get; set; }
-    public ReservaCorporativa? ReservaCorporativa { get; set; }
 
-    // Navegación
-    public Reserva? Reserva { get; set; }
-    public Habitacion? Habitacion { get; set; }
-    public Cliente? ClienteTitular { get; set; }
-    public ICollection<ItemEstancia> ItemsEstancia { get; set; } = new List<ItemEstancia>();
-    public ICollection<Huesped> Huespedes { get; set; } = new List<Huesped>();
+    public int IdHabitacion { get; set; }
+
+    public int IdClienteTitular { get; set; }
+
+    public int IdEstadoEstancia { get; set; }
+
+    public DateTime FechaCheckin { get; set; }
+
+    public DateTime FechaCheckoutPrevista { get; set; }
+
+    public DateTime? FechaCheckoutReal { get; set; }
+
+    public decimal MontoTotal { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public bool EstaFuera { get; set; }
+
+    public DateTime? HoraSalidaTemporal { get; set; }
+
+    public DateTime? HoraRegresoTemporal { get; set; }
+
+    public bool? LlavesDejadas { get; set; }
+
+    public virtual ICollection<Comprobante> Comprobantes { get; set; } = new List<Comprobante>();
+
+    public virtual ICollection<HistorialTraslado> HistorialTraslados { get; set; } = new List<HistorialTraslado>();
+
+    public virtual ICollection<Huesped> Huespedes { get; set; } = new List<Huesped>();
+
+    public virtual Cliente IdClienteTitularNavigation { get; set; } = null!;
+
+    public virtual EstadoEstancia IdEstadoEstanciaNavigation { get; set; } = null!;
+
+    public virtual Habitacion IdHabitacionNavigation { get; set; } = null!;
+
+    public virtual ReservaCorporativa? IdReservaCorporativaNavigation { get; set; }
+
+    public virtual Reserva? IdReservaNavigation { get; set; }
+
+    public virtual ICollection<Incidente> Incidentes { get; set; } = new List<Incidente>();
+
+    public virtual ICollection<ItemEstancia> ItemsEstancia { get; set; } = new List<ItemEstancia>();
+
+    public virtual ICollection<MovimientoStock> MovimientoStocks { get; set; } = new List<MovimientoStock>();
+
+    public virtual ICollection<ObjetoPerdido> ObjetoPerdidos { get; set; } = new List<ObjetoPerdido>();
+
+    // Convenience navigation properties for backward compatibility
+    public Habitacion? Habitacion => IdHabitacionNavigation;
+    public Cliente? ClienteTitular => IdClienteTitularNavigation;
+    public string? Estado => IdEstadoEstanciaNavigation?.Codigo;
 }

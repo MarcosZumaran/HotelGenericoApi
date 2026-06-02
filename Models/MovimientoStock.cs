@@ -33,7 +33,7 @@ public partial class MovimientoStock
 
     public virtual TipoMovimientoStock CodigoTipoMovimientoNavigation { get; set; } = null!;
 
-    public virtual Estancium? IdEstanciaNavigation { get; set; }
+    public virtual Estancia? IdEstanciaNavigation { get; set; }
 
     public virtual Habitacion? IdHabitacionNavigation { get; set; }
 

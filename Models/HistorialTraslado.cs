@@ -21,7 +21,7 @@ public partial class HistorialTraslado
 
     public decimal? AjusteMonto { get; set; }
 
-    public virtual Estancium IdEstanciaNavigation { get; set; } = null!;
+    public virtual Estancia IdEstanciaNavigation { get; set; } = null!;
 
     public virtual Habitacion IdHabitacionDestinoNavigation { get; set; } = null!;
 

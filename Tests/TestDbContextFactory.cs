@@ -59,7 +59,9 @@ public static class TestDbContextFactory
             TipoDocumento = "0",
             Documento = "00000000",
             Nombres = "CLIENTE",
-            Apellidos = "ANONIMO"
+            Apellidos = "ANONIMO",
+            CodigoInterno = "CLI-00000000",
+            Nacionalidad = "PERUANA"
         });
 
         db.Clientes.Add(new Cliente
@@ -68,7 +70,9 @@ public static class TestDbContextFactory
             TipoDocumento = "1",
             Documento = "61077298",
             Nombres = "Test",
-            Apellidos = "Cliente"
+            Apellidos = "Cliente",
+            CodigoInterno = "CLI-61077298",
+            Nacionalidad = "PERUANA"
         });
 
         db.Configuraciones.Add(new Configuracion
@@ -83,6 +87,18 @@ public static class TestDbContextFactory
             IdTarifa = 1,
             IdTipoHabitacion = 1,
             Precio = 50m
+        });
+
+        db.Productos.Add(new Producto
+        {
+            IdProducto = 1,
+            Nombre = "Gaseosa",
+            PrecioUnitario = 5m,
+            IdAfectacionIgv = "1",
+            UnidadMedida = "UNIDAD",
+            Stock = 50,
+            StockPorHabitacion = 10,
+            StockMinimo = 0
         });
 
         db.SaveChanges();

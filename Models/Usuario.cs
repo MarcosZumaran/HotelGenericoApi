@@ -21,7 +21,7 @@ public partial class Usuario
 
     public virtual ICollection<Habitacion> Habitacions { get; set; } = new List<Habitacion>();
 
-    public virtual ICollection<HistorialEstadoHabitacion> HistorialEstadoHabitacions { get; set; } = new List<HistorialEstadoHabitacion>();
+    public virtual ICollection<HistorialEstadoHabitacion> HistorialEstadoHabitaciones { get; set; } = new List<HistorialEstadoHabitacion>();
 
     public virtual ICollection<HistorialTraslado> HistorialTraslados { get; set; } = new List<HistorialTraslado>();
 
@@ -34,4 +34,7 @@ public partial class Usuario
     public virtual ICollection<Reserva> Reservas { get; set; } = new List<Reserva>();
 
     public virtual ICollection<Ventum> Venta { get; set; } = new List<Ventum>();
+
+    // Convenience navigation properties
+    public RolUsuario? Rol => IdRolNavigation;
 }

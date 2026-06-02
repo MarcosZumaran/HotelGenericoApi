@@ -63,7 +63,7 @@ public class ComprobanteService : IComprobanteService
 
         entity.IdEstadoSunat = 2;
         entity.FechaEnvio = DateTime.UtcNow;
-        entity.IntentosEnvio = (entity.IntentosEnvio ?? 0) + 1;
+        entity.IntentosEnvio = entity.IntentosEnvio + 1;
         entity.HashXml = hashXml;
         await _db.SaveChangesAsync();
 

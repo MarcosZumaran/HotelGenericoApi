@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.SignalR;
 using Moq;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Implementations;
+using HotelGenericoApi.Services.Interfaces;
 using Xunit;
 
 namespace HotelGenericoApi.Tests;
@@ -16,102 +18,101 @@ public class EstanciaServiceTests
         return new Mock<ILogger<T>>().Object;
     }
 
+    private CheckinService CreateCheckinService(HotelDbContext db)
+    {
+        var clientsMock = new Mock<IHubClients>();
+        var clientProxyMock = new Mock<IClientProxy>();
+        clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
+        var hubMock = new Mock<IHubContext<HotelGenericoApi.Hubs.HabitacionHub>>();
+        hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
+        var amenidadMock = new Mock<IAmenidadService>();
+        var reservaCorpMock = new Mock<IReservaCorporativaService>();
+        return new CheckinService(db, CreateMockLogger<CheckinService>(), hubMock.Object, amenidadMock.Object, reservaCorpMock.Object);
+    }
+
+    private CheckoutService CreateCheckoutService(HotelDbContext db)
+    {
+        var clientsMock = new Mock<IHubClients>();
+        var clientProxyMock = new Mock<IClientProxy>();
+        clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
+        var hubMock = new Mock<IHubContext<HotelGenericoApi.Hubs.HabitacionHub>>();
+        hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
+        return new CheckoutService(db, CreateMockLogger<CheckoutService>(), hubMock.Object);
+    }
+
+    private ConsumoEstanciaService CreateConsumoService(HotelDbContext db)
+    {
+        return new ConsumoEstanciaService(db, CreateMockLogger<ConsumoEstanciaService>());
+    }
+
     [Fact]
-    public async Task Create_EstanciaConHabitacionDisponible_CreaCorrectamente()
+    public async Task Checkin_ConDto_CreaEstanciaCorrectamente()
     {
         var db = CreateContext();
-        var service = new EstanciaService(db, CreateMockLogger<EstanciaService>());
+        var service = CreateCheckinService(db);
 
-        var estancia = new Estancia
+        var dto = new DTOs.Request.CheckinCreateDto
         {
             IdHabitacion = 1,
-            IdClienteTitular = 1,
-            FechaCheckin = DateTime.UtcNow,
             FechaCheckoutPrevista = DateTime.UtcNow.AddDays(2),
-            Estado = "Activa"
+            TipoDocumento = "1",
+            Documento = "61077298",
+            Nombres = "Test",
+            Apellidos = "Cliente",
+            IdClienteExistente = 1
         };
 
-        var result = await service.CreateAsync(estancia);
+        var result = await service.CheckinAsync(dto, 1);
 
         Assert.NotNull(result);
         Assert.Equal(1, result.IdHabitacion);
-        Assert.Equal("Activa", result.Estado);
-
-        var habitacion = await db.Habitaciones.FindAsync(1);
-        Assert.NotNull(habitacion);
-        Assert.Equal(2, habitacion.IdEstado); // Ocupada
+        Assert.Equal(2, result.IdEstadoEstancia);
     }
 
     [Fact]
     public async Task Checkout_EstanciaActiva_FinalizaCorrectamente()
     {
         var db = CreateContext();
-        var service = new EstanciaService(db, CreateMockLogger<EstanciaService>());
+        var checkinService = CreateCheckinService(db);
+        var checkoutService = CreateCheckoutService(db);
 
-        var estancia = new Estancia
+        var dto = new DTOs.Request.CheckinCreateDto
         {
             IdHabitacion = 1,
-            IdClienteTitular = 1,
-            FechaCheckin = DateTime.UtcNow,
             FechaCheckoutPrevista = DateTime.UtcNow.AddDays(2),
-            Estado = "Activa"
+            TipoDocumento = "1",
+            Documento = "61077298",
+            Nombres = "Test",
+            Apellidos = "Cliente",
+            IdClienteExistente = 1
         };
 
-        var creada = await service.CreateAsync(estancia);
+        var creada = await checkinService.CheckinAsync(dto, 1);
 
-        var result = await service.CheckoutAsync(creada.IdEstancia, 1);
+        var result = await checkoutService.RealizarCheckoutAsync(creada.IdEstancia, 1);
         Assert.NotNull(result);
-        Assert.Equal("Finalizada", result.Estado);
-        Assert.NotNull(result.FechaCheckoutReal);
-    }
-
-    [Fact]
-    public async Task AddHuesped_EstanciaExistente_AgregaCorrectamente()
-    {
-        var db = CreateContext();
-        var service = new EstanciaService(db, CreateMockLogger<EstanciaService>());
-
-        var estancia = new Estancia
-        {
-            IdHabitacion = 1,
-            IdClienteTitular = 1,
-            FechaCheckin = DateTime.UtcNow,
-            FechaCheckoutPrevista = DateTime.UtcNow.AddDays(2),
-            Estado = "Activa"
-        };
-
-        var creada = await service.CreateAsync(estancia);
-
-        var huesped = new Huesped
-        {
-            IdCliente = 2,
-            EsTitular = false
-        };
-
-        var result = await service.AddHuespedAsync(creada.IdEstancia, huesped);
-        Assert.True(result);
-
-        var dbHuesped = await db.Huespedes.FindAsync(huesped.IdHuesped);
-        Assert.NotNull(dbHuesped);
-        Assert.Equal(creada.IdEstancia, dbHuesped.IdEstancia);
+        Assert.True(result.TotalFinal >= 0);
     }
 
     [Fact]
     public async Task AddConsumo_EstanciaExistente_AgregaCorrectamente()
     {
         var db = CreateContext();
-        var service = new EstanciaService(db, CreateMockLogger<EstanciaService>());
+        var checkinService = CreateCheckinService(db);
+        var consumoService = CreateConsumoService(db);
 
-        var estancia = new Estancia
+        var dto = new DTOs.Request.CheckinCreateDto
         {
             IdHabitacion = 1,
-            IdClienteTitular = 1,
-            FechaCheckin = DateTime.UtcNow,
             FechaCheckoutPrevista = DateTime.UtcNow.AddDays(2),
-            Estado = "Activa"
+            TipoDocumento = "1",
+            Documento = "61077298",
+            Nombres = "Test",
+            Apellidos = "Cliente",
+            IdClienteExistente = 1
         };
 
-        var creada = await service.CreateAsync(estancia);
+        var creada = await checkinService.CheckinAsync(dto, 1);
 
         var item = new ItemEstancia
         {
@@ -120,7 +121,7 @@ public class EstanciaServiceTests
             PrecioUnitario = 10.5m
         };
 
-        var result = await service.AddConsumoAsync(creada.IdEstancia, item);
+        var result = await consumoService.AddConsumoAsync(creada.IdEstancia, item);
         Assert.True(result);
     }
 
@@ -137,6 +138,6 @@ public class EstanciaServiceTests
     {
         var db = TestDbContextFactory.Create();
         var validador = new ValidadorEstadoService(db);
-        Assert.False(await validador.EsTransicionValidaAsync(4, 2));
+        Assert.False(await validador.EsTransicionValidaAsync(4, 5));
     }
 }

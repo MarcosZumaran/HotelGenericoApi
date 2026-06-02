@@ -18,4 +18,8 @@ public partial class StockHabitacion
     public virtual Habitacion IdHabitacionNavigation { get; set; } = null!;
 
     public virtual Producto IdProductoNavigation { get; set; } = null!;
+
+    // Convenience navigation properties
+    public Habitacion? Habitacion => IdHabitacionNavigation;
+    public Producto? Producto => IdProductoNavigation;
 }

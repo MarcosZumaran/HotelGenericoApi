@@ -47,7 +47,7 @@ public partial class Comprobante
 
     public virtual EstadoSunat IdEstadoSunatNavigation { get; set; } = null!;
 
-    public virtual Estancium? IdEstanciaNavigation { get; set; }
+    public virtual Estancia? IdEstanciaNavigation { get; set; }
 
     public virtual Ventum? IdVentaNavigation { get; set; }
 

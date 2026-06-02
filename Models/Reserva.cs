@@ -29,7 +29,7 @@ public partial class Reserva
 
     public bool EsNoShow { get; set; }
 
-    public virtual ICollection<Estancium> Estancia { get; set; } = new List<Estancium>();
+    public virtual ICollection<Estancia> Estancias { get; set; } = new List<Estancia>();
 
     public virtual Cliente IdClienteNavigation { get; set; } = null!;
 
@@ -40,4 +40,9 @@ public partial class Reserva
     public virtual ReservaCorporativa? IdReservaCorporativaNavigation { get; set; }
 
     public virtual Usuario IdUsuarioNavigation { get; set; } = null!;
+
+    // Convenience navigation properties
+    public Cliente? Cliente => IdClienteNavigation;
+    public Habitacion? Habitacion => IdHabitacionNavigation;
+    public string? Estado => IdEstadoReservaNavigation?.Codigo;
 }

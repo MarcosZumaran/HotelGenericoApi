@@ -39,8 +39,15 @@ public static class ServiceExtensions
         services.AddScoped<IUsuarioService, UsuarioService>();
         services.AddScoped<IClienteService, ClienteService>();
         services.AddScoped<IHabitacionService, HabitacionService>();
-        services.AddScoped<IEstanciaService, EstanciaService>();
-        services.AddScoped<IReservaService, ReservaService>();
+        services.AddScoped<IEstanciaQueryService, EstanciaQueryService>();
+        services.AddScoped<ICheckinService, CheckinService>();
+        services.AddScoped<ICheckoutService, CheckoutService>();
+        services.AddScoped<ISalidaTemporalService, SalidaTemporalService>();
+        services.AddScoped<IHuespedService, HuespedService>();
+        services.AddScoped<IConsumoEstanciaService, ConsumoEstanciaService>();
+        services.AddScoped<ITrasladoHabitacionService, TrasladoHabitacionService>();
+        services.AddScoped<IReservaQueryService, ReservaQueryService>();
+        services.AddScoped<IReservaCommandService, ReservaCommandService>();
         services.AddScoped<IProductoService, ProductoService>();
         services.AddScoped<IComprobanteService, ComprobanteService>();
         services.AddScoped<IReporteService, ReporteService>();

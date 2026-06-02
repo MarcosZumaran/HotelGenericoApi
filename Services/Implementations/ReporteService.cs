@@ -51,7 +51,7 @@ public class ReporteService : IReporteService
             {
                 Nombre = g.Key,
                 CantidadTotal = g.Sum(iv => iv.Cantidad),
-                IngresoTotal = g.Sum(iv => iv.Subtotal)
+                IngresoTotal = g.Sum(iv => iv.Subtotal).GetValueOrDefault()
             })
             .OrderByDescending(tp => tp.IngresoTotal)
             .Take(10)

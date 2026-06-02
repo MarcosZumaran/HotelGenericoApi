@@ -28,4 +28,8 @@ public partial class Ventum
     public virtual MetodoPago MetodoPagoNavigation { get; set; } = null!;
 
     public virtual ICollection<MovimientoStock> MovimientoStocks { get; set; } = new List<MovimientoStock>();
+
+    // Convenience navigation properties
+    public Cliente? Cliente => IdClienteNavigation;
+    public ICollection<ItemVentum> ItemsVenta => ItemVenta;
 }

@@ -1,9 +1,15 @@
-﻿namespace HotelGenericoApi.Models;
+﻿using System;
+using System.Collections.Generic;
 
-public class VOcupacionDiaria
+namespace HotelGenericoApi.Models;
+
+public partial class VOcupacionDiaria
 {
-    public DateOnly Fecha { get; set; }
-    public int Ocupadas { get; set; }
-    public int Total { get; set; }
-    public decimal PorcentajeOcupacion { get; set; }
+    public DateOnly? Fecha { get; set; }
+
+    public int? Ocupadas { get; set; }
+
+    public int? Total { get; set; }
+
+    public decimal? PorcentajeOcupacion { get; set; }
 }

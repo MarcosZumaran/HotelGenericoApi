@@ -23,7 +23,11 @@ public partial class ObjetoPerdido
 
     public DateTime? FechaEntregado { get; set; }
 
-    public virtual Estancium? IdEstanciaNavigation { get; set; }
+    public virtual Estancia? IdEstanciaNavigation { get; set; }
 
     public virtual Habitacion? IdHabitacionNavigation { get; set; }
+
+    // Convenience navigation properties
+    public Habitacion? Habitacion => IdHabitacionNavigation;
+    public Estancia? Estancia => IdEstanciaNavigation;
 }

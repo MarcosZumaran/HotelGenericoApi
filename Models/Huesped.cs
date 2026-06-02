@@ -17,5 +17,8 @@ public partial class Huesped
 
     public virtual Cliente IdClienteNavigation { get; set; } = null!;
 
-    public virtual Estancium IdEstanciaNavigation { get; set; } = null!;
+    public virtual Estancia IdEstanciaNavigation { get; set; } = null!;
+
+    // Convenience navigation properties
+    public Cliente? Cliente => IdClienteNavigation;
 }

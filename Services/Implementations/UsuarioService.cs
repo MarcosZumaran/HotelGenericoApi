@@ -33,7 +33,7 @@ public class UsuarioService : IUsuarioService
     public async Task<IEnumerable<UsuarioResponseDto>> GetAllAsync()
     {
         var usuarios = await _db.Usuarios
-            .Include(u => u.Rol)   // EF crea esta navegación
+            .Include(u => u.IdRolNavigation)
             .AsNoTracking()
             .ToListAsync();
 
@@ -42,15 +42,15 @@ public class UsuarioService : IUsuarioService
             u.Username,
             u.IdRol,
             u.Rol?.Nombre ?? "",
-            u.EstaActivo ?? false,
-            u.FechaCreacion ?? DateTime.MinValue
+            u.EstaActivo,
+            u.FechaCreacion
         ));
     }
 
     public async Task<UsuarioResponseDto?> GetByIdAsync(int id)
     {
         var usuario = await _db.Usuarios
-            .Include(u => u.Rol)
+            .Include(u => u.IdRolNavigation)
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.IdUsuario == id);
 
@@ -61,8 +61,8 @@ public class UsuarioService : IUsuarioService
             usuario.Username,
             usuario.IdRol,
             usuario.Rol?.Nombre ?? "",
-            usuario.EstaActivo ?? false,
-            usuario.FechaCreacion ?? DateTime.MinValue
+            usuario.EstaActivo,
+            usuario.FechaCreacion
         );
     }
 
@@ -82,7 +82,7 @@ public class UsuarioService : IUsuarioService
             _db.Usuarios.Add(entity);
             await _db.SaveChangesAsync();
 
-            await _db.Entry(entity).Reference(u => u.Rol).LoadAsync();
+            await _db.Entry(entity).Reference(u => u.IdRolNavigation).LoadAsync();
 
             await transaction.CommitAsync();
 
@@ -91,8 +91,8 @@ public class UsuarioService : IUsuarioService
                 entity.Username,
                 entity.IdRol,
                 entity.Rol?.Nombre ?? "",
-                entity.EstaActivo ?? false,
-                entity.FechaCreacion ?? DateTime.MinValue
+                entity.EstaActivo,
+                entity.FechaCreacion
             );
         }
         catch
@@ -138,7 +138,7 @@ public class UsuarioService : IUsuarioService
     public async Task<(string token, UsuarioResponseDto usuario)?> LoginAsync(LoginDto dto, string? ipAddress = null, string? userAgent = null)
     {
         var usuario = await _db.Usuarios
-            .Include(u => u.Rol)
+            .Include(u => u.IdRolNavigation)
             .FirstOrDefaultAsync(u => u.Username == dto.Username && u.EstaActivo == true);
 
         bool succeeded;
@@ -159,8 +159,8 @@ public class UsuarioService : IUsuarioService
             usuario.Username,
             usuario.IdRol,
             usuario.Rol?.Nombre ?? "",
-            usuario.EstaActivo ?? false,
-            usuario.FechaCreacion ?? DateTime.MinValue
+            usuario.EstaActivo,
+            usuario.FechaCreacion
         );
 
         return (token, usuarioDto);

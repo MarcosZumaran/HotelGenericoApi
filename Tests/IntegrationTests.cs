@@ -40,7 +40,7 @@ public class IntegrationTests : IClassFixture<CustomWebApplicationFactory>
             Encoding.UTF8,
             "application/json");
 
-        var response = await client.PostAsync("/api/usuario/login", content);
+        var response = await client.PostAsync("/api/v1/usuario/login", content);
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(HttpStatusCode.Unauthorized == response.StatusCode,
             $"Expected 401 but got {(int)response.StatusCode}: {body}");
@@ -50,7 +50,7 @@ public class IntegrationTests : IClassFixture<CustomWebApplicationFactory>
     public async Task ProtectedEndpoint_WithoutToken_ReturnsUnauthorized()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/habitacion");
+        var response = await client.GetAsync("/api/v1/habitacion");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 

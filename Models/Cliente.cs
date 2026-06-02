@@ -33,9 +33,9 @@ public partial class Cliente
 
     public DateTime? FechaVerificacionReniec { get; set; }
 
-    public virtual ICollection<Estancium> Estancia { get; set; } = new List<Estancium>();
+    public virtual ICollection<Estancia> Estancias { get; set; } = new List<Estancia>();
 
-    public virtual ICollection<Huesped> Huespeds { get; set; } = new List<Huesped>();
+    public virtual ICollection<Huesped> Huespedes { get; set; } = new List<Huesped>();
 
     public virtual ICollection<ReservaCorporativa> ReservaCorporativas { get; set; } = new List<ReservaCorporativa>();
 

@@ -20,4 +20,8 @@ public partial class ItemVentum
     public virtual Producto IdProductoNavigation { get; set; } = null!;
 
     public virtual Ventum IdVentaNavigation { get; set; } = null!;
+
+    // Convenience navigation properties
+    public Ventum? Venta => IdVentaNavigation;
+    public Producto? Producto => IdProductoNavigation;
 }

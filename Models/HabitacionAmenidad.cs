@@ -16,4 +16,7 @@ public partial class HabitacionAmenidad
     public virtual Habitacion IdHabitacionNavigation { get; set; } = null!;
 
     public virtual Producto IdProductoNavigation { get; set; } = null!;
+
+    // Convenience navigation properties
+    public Producto? Producto => IdProductoNavigation;
 }

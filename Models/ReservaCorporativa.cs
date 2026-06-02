@@ -21,9 +21,12 @@ public partial class ReservaCorporativa
 
     public DateTime FechaRegistro { get; set; }
 
-    public virtual ICollection<Estancium> Estancia { get; set; } = new List<Estancium>();
+    public virtual ICollection<Estancia> Estancias { get; set; } = new List<Estancia>();
 
     public virtual Cliente IdClienteEmpresaNavigation { get; set; } = null!;
 
     public virtual ICollection<Reserva> Reservas { get; set; } = new List<Reserva>();
+
+    // Convenience navigation properties
+    public Cliente? ClienteEmpresa => IdClienteEmpresaNavigation;
 }

@@ -35,17 +35,20 @@ public partial class Producto
 
     public DateTime CreatedAt { get; set; }
 
-    public virtual ICollection<HabitacionAmenidad> HabitacionAmenidads { get; set; } = new List<HabitacionAmenidad>();
+    public virtual ICollection<HabitacionAmenidad> HabitacionAmenidades { get; set; } = new List<HabitacionAmenidad>();
 
     public virtual AfectacionIgv IdAfectacionIgvNavigation { get; set; } = null!;
 
     public virtual CategoriaProducto? IdCategoriaNavigation { get; set; }
 
-    public virtual ICollection<ItemEstancium> ItemEstancia { get; set; } = new List<ItemEstancium>();
+    public virtual ICollection<ItemEstancia> ItemsEstancia { get; set; } = new List<ItemEstancia>();
 
     public virtual ICollection<ItemVentum> ItemVenta { get; set; } = new List<ItemVentum>();
 
     public virtual ICollection<MovimientoStock> MovimientoStocks { get; set; } = new List<MovimientoStock>();
 
     public virtual ICollection<StockHabitacion> StockHabitacions { get; set; } = new List<StockHabitacion>();
+
+    // Convenience navigation properties
+    public AfectacionIgv? AfectacionIgv => IdAfectacionIgvNavigation;
 }

@@ -3,6 +3,7 @@ using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
+using HotelGenericoApi.Constants;
 using HotelGenericoApi.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using HotelGenericoApi.Hubs;
@@ -23,7 +24,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
     public async Task<IEnumerable<ReservaCorporativaResponseDto>> GetAllAsync()
     {
         var reservas = await _db.ReservasCorporativas
-            .Include(r => r.ClienteEmpresa)
+            .Include(r => r.IdClienteEmpresaNavigation)
             .Include(r => r.Estancias)
                 .ThenInclude(e => e.ItemsEstancia)
             .AsNoTracking()
@@ -35,14 +36,14 @@ public class ReservaCorporativaService : IReservaCorporativaService
             IdClienteEmpresa = r.IdClienteEmpresa,
             NombreEmpresa = r.ClienteEmpresa != null ? $"{r.ClienteEmpresa.Nombres} {r.ClienteEmpresa.Apellidos}" : "",
             RucEmpresa = r.ClienteEmpresa != null ? r.ClienteEmpresa.Documento : "",
-            FechaInicio = r.FechaInicio,
-            FechaFin = r.FechaFin,
+            FechaInicio = r.FechaInicio.ToDateTime(TimeOnly.MinValue),
+            FechaFin = r.FechaFin.ToDateTime(TimeOnly.MinValue),
             NumeroHabitaciones = r.NumeroHabitaciones,
-            HabitacionesOcupadas = r.Estancias.Count(e => e.Estado == "Activa"),
+            HabitacionesOcupadas = r.Estancias.Count(e => e.Estado == EstadoEstanciaCodigo.Code.Activa),
             Estado = r.Estado,
             TotalAcumulado = r.Estancias
                 .Where(e => e.FechaCheckoutReal != null)
-                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
+                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal.GetValueOrDefault()) : 0)),
             Observaciones = r.Observaciones,
             FechaRegistro = r.FechaRegistro
         });
@@ -53,7 +54,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
     public async Task<ReservaCorporativaResponseDto?> GetByIdAsync(int id)
     {
         var reserva = await _db.ReservasCorporativas
-            .Include(r => r.ClienteEmpresa)
+            .Include(r => r.IdClienteEmpresaNavigation)
             .Include(r => r.Estancias)
                 .ThenInclude(e => e.ItemsEstancia)
             .FirstOrDefaultAsync(r => r.IdReservaCorporativa == id);
@@ -62,12 +63,12 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
         var reservasIndividuales = await _db.Reservas
             .Where(r => r.IdReservaCorporativa == id)
-            .Include(r => r.Habitacion)
-                .ThenInclude(h => h.Tipo)
+            .Include(r => r.IdHabitacionNavigation)
+                .ThenInclude(h => h.IdTipoNavigation)
             .ToListAsync();
 
         var estanciasActivas = await _db.Estancias
-            .Where(e => e.IdReservaCorporativa == id && e.Estado == "Activa")
+            .Where(e => e.IdReservaCorporativa == id && e.Estado == EstadoEstanciaCodigo.Code.Activa)
             .ToListAsync();
 
         var habitacionesDto = reservasIndividuales.Select(r => new HabitacionResumenDto
@@ -97,14 +98,14 @@ public class ReservaCorporativaService : IReservaCorporativaService
             IdClienteEmpresa = reserva.IdClienteEmpresa,
             NombreEmpresa = reserva.ClienteEmpresa != null ? $"{reserva.ClienteEmpresa.Nombres} {reserva.ClienteEmpresa.Apellidos}" : "",
             RucEmpresa = reserva.ClienteEmpresa != null ? reserva.ClienteEmpresa.Documento : "",
-            FechaInicio = reserva.FechaInicio,
-            FechaFin = reserva.FechaFin,
+            FechaInicio = reserva.FechaInicio.ToDateTime(TimeOnly.MinValue),
+            FechaFin = reserva.FechaFin.ToDateTime(TimeOnly.MinValue),
             NumeroHabitaciones = reserva.NumeroHabitaciones,
             HabitacionesOcupadas = estanciasActivas.Count,
             Estado = reserva.Estado,
             TotalAcumulado = reserva.Estancias
                 .Where(e => e.FechaCheckoutReal != null)
-                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
+                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal.GetValueOrDefault()) : 0)),
             Observaciones = reserva.Observaciones,
             FechaRegistro = reserva.FechaRegistro,
             Habitaciones = habitacionesDto
@@ -120,10 +121,10 @@ public class ReservaCorporativaService : IReservaCorporativaService
         var reservaMultiple = new ReservaCorporativa
         {
             IdClienteEmpresa = dto.IdClienteEmpresa,
-            FechaInicio = dto.FechaInicio,
-            FechaFin = dto.FechaFin,
+            FechaInicio = DateOnly.FromDateTime(dto.FechaInicio),
+            FechaFin = DateOnly.FromDateTime(dto.FechaFin),
             NumeroHabitaciones = dto.HabitacionesIds.Count,
-            Estado = "Confirmada",
+            Estado = EstadoReservaCodigo.Code.Confirmada,
             Observaciones = dto.Observaciones,
             FechaRegistro = DateTime.UtcNow
         };
@@ -151,7 +152,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
                     FechaEntradaPrevista = dto.FechaInicio,
                     FechaSalidaPrevista = dto.FechaFin,
                     MontoTotal = montoTotal,
-                    Estado = "Confirmada",
+                    IdEstadoReserva = EstadoReservaCodigo.Confirmada,
                     EsNoShow = false,
                     Observaciones = $"Reserva múltiple #{reservaMultiple.IdReservaCorporativa}",
                     IdReservaCorporativa = reservaMultiple.IdReservaCorporativa
@@ -183,11 +184,11 @@ public class ReservaCorporativaService : IReservaCorporativaService
             .FirstOrDefaultAsync(r => r.IdReservaCorporativa == id);
         if (reserva == null) return false;
 
-        if (reserva.Estado != "Pendiente")
+        if (reserva.Estado != EstadoReservaCodigo.Code.Pendiente)
             throw new InvalidOperationException("Solo se pueden modificar reservas en estado Pendiente.");
 
-        reserva.FechaInicio = dto.FechaInicio;
-        reserva.FechaFin = dto.FechaFin;
+        reserva.FechaInicio = DateOnly.FromDateTime(dto.FechaInicio);
+        reserva.FechaFin = DateOnly.FromDateTime(dto.FechaFin);
         reserva.NumeroHabitaciones = dto.HabitacionesIds.Count;
         reserva.Observaciones = dto.Observaciones;
 
@@ -215,7 +216,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
                 FechaEntradaPrevista = dto.FechaInicio,
                 FechaSalidaPrevista = dto.FechaFin,
                 MontoTotal = montoTotal,
-                Estado = "Confirmada",
+                IdEstadoReserva = EstadoReservaCodigo.Confirmada,
                 EsNoShow = false,
                 Observaciones = $"Reserva múltiple #{reserva.IdReservaCorporativa} (actualizada)",
                 IdReservaCorporativa = reserva.IdReservaCorporativa
@@ -235,10 +236,10 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
         if (reserva == null) return false;
 
-        if (reserva.Estancias.Any(e => e.Estado == "Activa"))
+        if (reserva.Estancias.Any(e => e.Estado == EstadoEstanciaCodigo.Code.Activa))
             throw new InvalidOperationException("No se puede eliminar una reserva corporativa con estancias activas.");
 
-        if (reserva.Estado != "Pendiente")
+        if (reserva.Estado != EstadoReservaCodigo.Code.Pendiente)
             throw new InvalidOperationException("Solo se pueden eliminar reservas en estado Pendiente.");
 
         var reservasIndividuales = await _db.Reservas
@@ -256,20 +257,20 @@ public class ReservaCorporativaService : IReservaCorporativaService
         var reserva = await _db.ReservasCorporativas
             .Include(r => r.Estancias)
                 .ThenInclude(e => e.ItemsEstancia)
-            .Include(r => r.ClienteEmpresa)
+            .Include(r => r.IdClienteEmpresaNavigation)
             .FirstOrDefaultAsync(r => r.IdReservaCorporativa == id);
 
         if (reserva == null)
             throw new ArgumentException("Reserva corporativa no encontrada.");
 
-        if (reserva.Estado == "Finalizada")
+        if (reserva.Estado == EstadoEstanciaCodigo.Code.Finalizada)
             throw new InvalidOperationException("La reserva ya está finalizada.");
 
         var estanciasPendientes = reserva.Estancias.Any(e => e.FechaCheckoutReal == null);
         if (estanciasPendientes)
             throw new InvalidOperationException("No se puede finalizar porque hay estancias activas sin checkout.");
 
-        decimal totalFinal = reserva.Estancias.Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0));
+        decimal totalFinal = reserva.Estancias.Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal.GetValueOrDefault()) : 0));
 
         var comprobante = new Comprobante
         {
@@ -290,7 +291,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
         };
 
         _db.Comprobantes.Add(comprobante);
-        reserva.Estado = "Finalizada";
+        reserva.Estado = EstadoEstanciaCodigo.Code.Finalizada;
         await _db.SaveChangesAsync();
 
         return (await GetByIdAsync(id))!;
@@ -303,9 +304,9 @@ public class ReservaCorporativaService : IReservaCorporativaService
             .FirstOrDefaultAsync(r => r.IdReservaCorporativa == idReservaCorporativa);
 
         if (reserva == null) return false;
-        if (reserva.Estado != "Confirmada" && reserva.Estado != "Pendiente") return false;
+        if (reserva.Estado != EstadoReservaCodigo.Code.Confirmada && reserva.Estado != EstadoReservaCodigo.Code.Pendiente) return false;
 
-        var activas = reserva.Estancias.Count(e => e.Estado == "Activa");
+        var activas = reserva.Estancias.Count(e => e.Estado == EstadoEstanciaCodigo.Code.Activa);
         return activas < reserva.NumeroHabitaciones;
     }
 

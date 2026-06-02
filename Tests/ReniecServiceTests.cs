@@ -2,6 +2,7 @@ using System.Net;
 using Moq;
 using Moq.Protected;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using HotelGenericoApi.Services.Implementations;
 using HotelGenericoApi.Models.Exceptions;
 using Xunit;
@@ -10,6 +11,13 @@ namespace HotelGenericoApi.Tests;
 
 public class ReniecServiceTests
 {
+    private static IConfiguration CreateMockConfiguration()
+    {
+        var configMock = new Mock<IConfiguration>();
+        configMock.Setup(c => c["VerificaPE:ApiKey"]).Returns("fake-api-key");
+        return configMock.Object;
+    }
+
     [Fact]
     public async Task ConsultarDniAsync_HttpRequestException_ThrowsExternalServiceException()
     {
@@ -19,7 +27,7 @@ public class ReniecServiceTests
             .ThrowsAsync(new HttpRequestException("Error de red"));
         var client = new HttpClient(mockHttp.Object) { BaseAddress = new Uri("http://localhost") };
         var logger = new Mock<ILogger<ReniecService>>();
-        var service = new ReniecService(client, logger.Object);
+        var service = new ReniecService(client, logger.Object, CreateMockConfiguration());
 
         await Assert.ThrowsAsync<ExternalServiceException>(() => service.ConsultarDniAsync("12345678"));
     }
@@ -33,7 +41,7 @@ public class ReniecServiceTests
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.NotFound));
         var client = new HttpClient(mockHttp.Object) { BaseAddress = new Uri("http://localhost") };
         var logger = new Mock<ILogger<ReniecService>>();
-        var service = new ReniecService(client, logger.Object);
+        var service = new ReniecService(client, logger.Object, CreateMockConfiguration());
 
         var result = await service.ConsultarDniAsync("99999999");
 
@@ -49,7 +57,7 @@ public class ReniecServiceTests
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"dni\":\"12345678\"}") });
         var client = new HttpClient(mockHttp.Object) { BaseAddress = new Uri("http://localhost") };
         var logger = new Mock<ILogger<ReniecService>>();
-        var service = new ReniecService(client, logger.Object);
+        var service = new ReniecService(client, logger.Object, CreateMockConfiguration());
 
         var result = await service.ConsultarDniAsync("12345678");
 

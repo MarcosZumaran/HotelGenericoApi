@@ -25,11 +25,11 @@ public partial class Habitacion
 
     public int? UsuarioCambio { get; set; }
 
-    public virtual ICollection<Estancium> Estancia { get; set; } = new List<Estancium>();
+    public virtual ICollection<Estancia> Estancias { get; set; } = new List<Estancia>();
 
-    public virtual ICollection<HabitacionAmenidad> HabitacionAmenidads { get; set; } = new List<HabitacionAmenidad>();
+    public virtual ICollection<HabitacionAmenidad> HabitacionAmenidades { get; set; } = new List<HabitacionAmenidad>();
 
-    public virtual ICollection<HistorialEstadoHabitacion> HistorialEstadoHabitacions { get; set; } = new List<HistorialEstadoHabitacion>();
+    public virtual ICollection<HistorialEstadoHabitacion> HistorialEstadoHabitaciones { get; set; } = new List<HistorialEstadoHabitacion>();
 
     public virtual ICollection<HistorialTraslado> HistorialTrasladoIdHabitacionDestinoNavigations { get; set; } = new List<HistorialTraslado>();
 
@@ -50,4 +50,8 @@ public partial class Habitacion
     public virtual ICollection<StockHabitacion> StockHabitacions { get; set; } = new List<StockHabitacion>();
 
     public virtual Usuario? UsuarioCambioNavigation { get; set; }
+
+    // Convenience navigation properties
+    public TipoHabitacion? Tipo => IdTipoNavigation;
+    public string? Estado => IdEstadoNavigation?.Nombre;
 }

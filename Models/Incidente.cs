@@ -27,9 +27,13 @@ public partial class Incidente
 
     public int? ReportadoPor { get; set; }
 
-    public virtual Estancium? IdEstanciaNavigation { get; set; }
+    public virtual Estancia? IdEstanciaNavigation { get; set; }
 
     public virtual Habitacion IdHabitacionNavigation { get; set; } = null!;
 
     public virtual Usuario? ReportadoPorNavigation { get; set; }
+
+    // Convenience navigation properties
+    public Habitacion? Habitacion => IdHabitacionNavigation;
+    public Usuario? UsuarioReporte => ReportadoPorNavigation;
 }
