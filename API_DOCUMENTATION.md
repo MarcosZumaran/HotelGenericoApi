@@ -1,6 +1,6 @@
 # Hotel Generico API - Documentacion de Endpoints
 
-**Base URL:** `http://localhost:5000/api/v1`
+**Base URL:** `http://localhost:5054/api/v1`
 **Auth:** Cookie `auth_token` (HttpOnly, se obtiene via login)
 **Format:** JSON siempre (excepto PDFs que son `application/pdf`)
 **Case:** Las URLs son case-insensitive (`/api/v1/Estancia` ≡ `/api/v1/estancia`)
