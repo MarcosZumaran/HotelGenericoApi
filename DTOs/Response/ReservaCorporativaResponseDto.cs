@@ -14,4 +14,5 @@ public class ReservaCorporativaResponseDto
     public decimal TotalAcumulado { get; set; }
     public string? Observaciones { get; set; }
     public DateTime? FechaRegistro { get; set; }
+    public List<HabitacionResumenDto> Habitaciones { get; set; } = new List<HabitacionResumenDto>();
 }

@@ -60,6 +60,37 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
         if (reserva == null) return null;
 
+        var reservasIndividuales = await _db.Reservas
+            .Where(r => r.IdReservaCorporativa == id)
+            .Include(r => r.Habitacion)
+                .ThenInclude(h => h.Tipo)
+            .ToListAsync();
+
+        var estanciasActivas = await _db.Estancias
+            .Where(e => e.IdReservaCorporativa == id && e.Estado == "Activa")
+            .ToListAsync();
+
+        var habitacionesDto = reservasIndividuales.Select(r => new HabitacionResumenDto
+        {
+            IdHabitacion = r.IdHabitacion,
+            NumeroHabitacion = r.Habitacion?.NumeroHabitacion ?? "",
+            TipoNombre = r.Habitacion?.Tipo?.Nombre ?? "",
+            PrecioNoche = r.Habitacion?.PrecioNoche ?? 0,
+            IdReserva = r.IdReserva,
+            Estado = "Reservada",
+            IdEstanciaActiva = null
+        }).ToList();
+
+        foreach (var est in estanciasActivas)
+        {
+            var hab = habitacionesDto.FirstOrDefault(h => h.IdHabitacion == est.IdHabitacion);
+            if (hab != null)
+            {
+                hab.Estado = "Ocupada";
+                hab.IdEstanciaActiva = est.IdEstancia;
+            }
+        }
+
         return new ReservaCorporativaResponseDto
         {
             IdReservaCorporativa = reserva.IdReservaCorporativa,
@@ -69,13 +100,14 @@ public class ReservaCorporativaService : IReservaCorporativaService
             FechaInicio = reserva.FechaInicio,
             FechaFin = reserva.FechaFin,
             NumeroHabitaciones = reserva.NumeroHabitaciones,
-            HabitacionesOcupadas = reserva.Estancias.Count(e => e.Estado == "Activa"),
+            HabitacionesOcupadas = estanciasActivas.Count,
             Estado = reserva.Estado,
             TotalAcumulado = reserva.Estancias
                 .Where(e => e.FechaCheckoutReal != null)
                 .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal) : 0)),
             Observaciones = reserva.Observaciones,
-            FechaRegistro = reserva.FechaRegistro
+            FechaRegistro = reserva.FechaRegistro,
+            Habitaciones = habitacionesDto
         };
     }
 
@@ -102,7 +134,6 @@ public class ReservaCorporativaService : IReservaCorporativaService
             _db.ReservasCorporativas.Add(reservaMultiple);
             await _db.SaveChangesAsync();
 
-            // Crear una reserva individual por cada habitación
             foreach (var habId in dto.HabitacionesIds)
             {
                 var habitacion = await _db.Habitaciones.FindAsync(habId);
@@ -122,7 +153,8 @@ public class ReservaCorporativaService : IReservaCorporativaService
                     MontoTotal = montoTotal,
                     Estado = "Confirmada",
                     EsNoShow = false,
-                    Observaciones = $"Reserva múltiple #{reservaMultiple.IdReservaCorporativa}"
+                    Observaciones = $"Reserva múltiple #{reservaMultiple.IdReservaCorporativa}",
+                    IdReservaCorporativa = reservaMultiple.IdReservaCorporativa
                 };
                 _db.Reservas.Add(reserva);
             }
@@ -130,7 +162,6 @@ public class ReservaCorporativaService : IReservaCorporativaService
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            // Notificar a cada habitación que tiene una nueva reserva
             foreach (var habId in dto.HabitacionesIds)
             {
                 await _hubContext.Clients.All.SendAsync("ReservaCreada", new { idHabitacion = habId });
@@ -145,9 +176,11 @@ public class ReservaCorporativaService : IReservaCorporativaService
         }
     }
 
-    public async Task<bool> UpdateAsync(int id, ReservaCorporativaCreateDto dto)
+    public async Task<bool> UpdateAsync(int id, ReservaCorporativaCreateDto dto, int idUsuario)
     {
-        var reserva = await _db.ReservasCorporativas.FindAsync(id);
+        var reserva = await _db.ReservasCorporativas
+            .Include(r => r.Estancias)
+            .FirstOrDefaultAsync(r => r.IdReservaCorporativa == id);
         if (reserva == null) return false;
 
         if (reserva.Estado != "Pendiente")
@@ -157,6 +190,38 @@ public class ReservaCorporativaService : IReservaCorporativaService
         reserva.FechaFin = dto.FechaFin;
         reserva.NumeroHabitaciones = dto.HabitacionesIds.Count;
         reserva.Observaciones = dto.Observaciones;
+
+        // Eliminar reservas individuales antiguas
+        var reservasExistentes = await _db.Reservas
+            .Where(r => r.IdReservaCorporativa == id)
+            .ToListAsync();
+        _db.Reservas.RemoveRange(reservasExistentes);
+
+        // Crear nuevas reservas individuales con las habitaciones actualizadas
+        foreach (var habId in dto.HabitacionesIds)
+        {
+            var habitacion = await _db.Habitaciones.FindAsync(habId);
+            if (habitacion == null) continue;
+
+            var noches = Math.Max(1, (int)(dto.FechaFin - dto.FechaInicio).TotalDays);
+            var montoTotal = noches * habitacion.PrecioNoche;
+
+            var nuevaReserva = new Reserva
+            {
+                IdCliente = dto.IdClienteEmpresa,
+                IdHabitacion = habId,
+                IdUsuario = idUsuario,
+                FechaRegistro = DateTime.UtcNow,
+                FechaEntradaPrevista = dto.FechaInicio,
+                FechaSalidaPrevista = dto.FechaFin,
+                MontoTotal = montoTotal,
+                Estado = "Confirmada",
+                EsNoShow = false,
+                Observaciones = $"Reserva múltiple #{reserva.IdReservaCorporativa} (actualizada)",
+                IdReservaCorporativa = reserva.IdReservaCorporativa
+            };
+            _db.Reservas.Add(nuevaReserva);
+        }
 
         await _db.SaveChangesAsync();
         return true;
@@ -175,6 +240,11 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
         if (reserva.Estado != "Pendiente")
             throw new InvalidOperationException("Solo se pueden eliminar reservas en estado Pendiente.");
+
+        var reservasIndividuales = await _db.Reservas
+            .Where(r => r.IdReservaCorporativa == id)
+            .ToListAsync();
+        _db.Reservas.RemoveRange(reservasIndividuales);
 
         _db.ReservasCorporativas.Remove(reserva);
         await _db.SaveChangesAsync();

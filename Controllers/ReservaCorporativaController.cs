@@ -48,7 +48,11 @@ public class ReservaCorporativaController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] ReservaCorporativaCreateDto dto)
     {
-        var result = await _reservaCorporativaService.UpdateAsync(id, dto);
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var result = await _reservaCorporativaService.UpdateAsync(id, dto, userId);
         if (!result) return NotFound();
         return NoContent();
     }

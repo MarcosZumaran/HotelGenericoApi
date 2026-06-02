@@ -13,6 +13,7 @@ public class Reserva
     public string? Estado { get; set; }
     public string? Observaciones { get; set; }
     public bool EsNoShow { get; set; }
+    public int? IdReservaCorporativa { get; set; }
 
     // Navegación
     public Cliente? Cliente { get; set; }
