@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.SignalR;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Response;
+using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.Hubs;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Interfaces;
@@ -38,11 +39,14 @@ public class HabitacionService : IHabitacionService
         return await _db.Habitaciones
             .Include(h => h.Tipo)
             .Include(h => h.Estado)
+            .Include(h => h.HabitacionAmenidades)
+                .ThenInclude(ha => ha.Producto)
             .FirstOrDefaultAsync(h => h.IdHabitacion == id);
     }
 
     public async Task<Habitacion> CreateAsync(Habitacion habitacion)
     {
+        // Si la habitación viene con amenidades, se deben guardar después
         _db.Habitaciones.Add(habitacion);
         await _db.SaveChangesAsync();
         _logger.LogInformation("Habitación {Numero} creada", habitacion.NumeroHabitacion);
@@ -51,14 +55,26 @@ public class HabitacionService : IHabitacionService
 
     public async Task<Habitacion?> UpdateAsync(int id, Habitacion habitacionActualizada)
     {
-        var existente = await _db.Habitaciones.FindAsync(id);
+        var existente = await _db.Habitaciones
+            .Include(h => h.HabitacionAmenidades)
+            .FirstOrDefaultAsync(h => h.IdHabitacion == id);
         if (existente == null) return null;
 
-        _db.Entry(existente).CurrentValues.SetValues(habitacionActualizada);
+        // Actualizar propiedades básicas
+        existente.NumeroHabitacion = habitacionActualizada.NumeroHabitacion;
+        existente.Piso = habitacionActualizada.Piso;
+        existente.Descripcion = habitacionActualizada.Descripcion;
+        existente.IdTipo = habitacionActualizada.IdTipo;
+        existente.PrecioNoche = habitacionActualizada.PrecioNoche;
+        existente.IdEstado = habitacionActualizada.IdEstado;
+        existente.Caracteristicas = habitacionActualizada.Caracteristicas;
+
+        // Las amenidades se actualizan aparte con el método específico
         await _db.SaveChangesAsync();
         _logger.LogInformation("Habitación {Numero} actualizada", existente.NumeroHabitacion);
         return existente;
     }
+
 
     public async Task<bool> DeleteAsync(int id)
     {
@@ -215,4 +231,48 @@ public class HabitacionService : IHabitacionService
 
         return todas.Where(h => !idsOcupadas.Contains(h.IdHabitacion)).ToList();
     }
+
+    public async Task<List<HabitacionAmenidad>> GetAmenidadesPorHabitacionAsync(int idHabitacion)
+    {
+        return await _db.HabitacionAmenidades
+            .Include(ha => ha.Producto)
+            .Where(ha => ha.IdHabitacion == idHabitacion)
+            .ToListAsync();
+    }
+
+    public async Task<bool> ActualizarAmenidadesAsync(int idHabitacion, List<HabitacionAmenidadDto> amenidades)
+    {
+        var existentes = await _db.HabitacionAmenidades
+            .Where(ha => ha.IdHabitacion == idHabitacion)
+            .ToListAsync();
+        _db.HabitacionAmenidades.RemoveRange(existentes);
+
+        var nuevas = amenidades.Select(a => new HabitacionAmenidad
+        {
+            IdHabitacion = idHabitacion,
+            IdProducto = a.IdProducto,
+            CantidadBase = a.CantidadBase
+        });
+        _db.HabitacionAmenidades.AddRange(nuevas);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<Dictionary<string, bool>?> GetCaracteristicasAsync(int idHabitacion)
+    {
+        var hab = await _db.Habitaciones.FindAsync(idHabitacion);
+        if (hab == null || string.IsNullOrEmpty(hab.Caracteristicas))
+            return null;
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, bool>>(hab.Caracteristicas);
+    }
+
+    public async Task<bool> ActualizarCaracteristicasAsync(int idHabitacion, Dictionary<string, bool> caracteristicas)
+    {
+        var hab = await _db.Habitaciones.FindAsync(idHabitacion);
+        if (hab == null) return false;
+        hab.Caracteristicas = System.Text.Json.JsonSerializer.Serialize(caracteristicas);
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
 }

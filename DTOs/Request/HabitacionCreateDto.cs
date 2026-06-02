@@ -22,4 +22,12 @@ public sealed record HabitacionCreateDto
     public decimal PrecioNoche { get; init; }
 
     public int? IdEstado { get; init; }
+    public Dictionary<string, bool>? Caracteristicas { get; init; }
+    public List<HabitacionAmenidadDto>? Amenidades { get; init; }
+}
+
+public record HabitacionAmenidadDto
+{
+    public int IdProducto { get; init; }
+    public int CantidadBase { get; init; }
 }

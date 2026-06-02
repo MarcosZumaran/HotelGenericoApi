@@ -40,6 +40,7 @@ public class HotelDbContext : DbContext
     public DbSet<Incidente> Incidentes => Set<Incidente>();
     public DbSet<ObjetoPerdido> ObjetosPerdidos => Set<ObjetoPerdido>();
     public DbSet<HistorialTraslado> HistorialTraslados => Set<HistorialTraslado>();
+    public DbSet<HabitacionAmenidad> HabitacionAmenidades => Set<HabitacionAmenidad>();
 
     // Vistas keyless
     public DbSet<VCierreCajaDiario> VCierreCajaDiario => Set<VCierreCajaDiario>();
@@ -593,6 +594,18 @@ public class HotelDbContext : DbContext
 
             entity.HasIndex(e => e.IdEstancia).HasDatabaseName("ix_traslado_estancia");
             entity.HasIndex(e => e.FechaTraslado).HasDatabaseName("ix_traslado_fecha").IsDescending();
+        });
+        modelBuilder.Entity<HabitacionAmenidad>(entity =>
+        {
+            entity.ToTable("habitacion_amenidad");
+            entity.HasKey(e => e.IdHabitacionAmenidad);
+            entity.Property(e => e.IdHabitacionAmenidad).HasColumnName("id_habitacion_amenidad");
+            entity.Property(e => e.IdHabitacion).HasColumnName("id_habitacion");
+            entity.Property(e => e.IdProducto).HasColumnName("id_producto");
+            entity.Property(e => e.CantidadBase).HasColumnName("cantidad_base");
+            entity.HasOne(e => e.Habitacion).WithMany(h => h.HabitacionAmenidades).HasForeignKey(e => e.IdHabitacion);
+            entity.HasOne(e => e.Producto).WithMany().HasForeignKey(e => e.IdProducto);
+            entity.HasIndex(e => new { e.IdHabitacion, e.IdProducto }).IsUnique();
         });
 
         // Vistas keyless

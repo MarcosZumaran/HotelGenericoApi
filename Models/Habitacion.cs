@@ -11,6 +11,7 @@ public class Habitacion
     public int IdEstado { get; set; }
     public DateTime? FechaUltimoCambio { get; set; }
     public int? UsuarioCambio { get; set; }
+    public string? Caracteristicas { get; set; }
 
     // Navegación
     public TipoHabitacion? Tipo { get; set; }
@@ -18,4 +19,5 @@ public class Habitacion
     public Usuario? Usuario { get; set; }
     public ICollection<Estancia> Estancias { get; set; } = new List<Estancia>();
     public ICollection<Reserva> Reservas { get; set; } = new List<Reserva>();
+    public ICollection<HabitacionAmenidad> HabitacionAmenidades { get; set; } = new List<HabitacionAmenidad>();
 }

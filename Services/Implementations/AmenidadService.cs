@@ -23,14 +23,35 @@ public class AmenidadService : IAmenidadService
     /// </summary>
     public async Task InicializarStockHabitacionAsync(int idHabitacion)
     {
-        var amenidades = await _db.Productos
-            .Where(p => p.EsAmenidad && p.StockPorHabitacion.HasValue && p.StockPorHabitacion > 0)
+        // Primero, obtener las amenidades personalizadas de la habitación
+        var amenidadesPersonalizadas = await _db.HabitacionAmenidades
+            .Include(ha => ha.Producto)
+            .Where(ha => ha.IdHabitacion == idHabitacion)
             .ToListAsync();
 
-        foreach (var producto in amenidades)
+        List<Producto> productosAInicializar;
+
+        if (amenidadesPersonalizadas.Any())
+        {
+            // Usar las amenidades personalizadas
+            productosAInicializar = amenidadesPersonalizadas.Select(ha => ha.Producto!).ToList();
+        }
+        else
+        {
+            // Usar las amenidades globales (todas con es_amenidad = true y stock_por_habitacion > 0)
+            productosAInicializar = await _db.Productos
+                .Where(p => p.EsAmenidad && p.StockPorHabitacion.HasValue && p.StockPorHabitacion > 0)
+                .ToListAsync();
+        }
+
+        foreach (var producto in productosAInicializar)
         {
             var stockActual = await _db.StockHabitaciones
                 .FirstOrDefaultAsync(s => s.IdHabitacion == idHabitacion && s.IdProducto == producto.IdProducto);
+
+            var cantidadBase = amenidadesPersonalizadas
+                .FirstOrDefault(ha => ha.IdProducto == producto.IdProducto)?.CantidadBase
+                ?? producto.StockPorHabitacion ?? 0;
 
             if (stockActual == null)
             {
@@ -38,12 +59,12 @@ public class AmenidadService : IAmenidadService
                 {
                     IdHabitacion = idHabitacion,
                     IdProducto = producto.IdProducto,
-                    CantidadActual = producto.StockPorHabitacion!.Value
+                    CantidadActual = cantidadBase
                 });
             }
             else
             {
-                stockActual.CantidadActual = producto.StockPorHabitacion!.Value;
+                stockActual.CantidadActual = cantidadBase;
             }
         }
 
