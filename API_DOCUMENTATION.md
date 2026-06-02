@@ -647,17 +647,60 @@ Auth: Si
 ### GET /reserva-corporativa
 Auth: Si
 
+Response 200:
+```json
+[
+  {
+    "idReservaCorporativa": 1,
+    "nombreEmpresa": "Corp SAC",
+    "contactoNombre": "Juan Perez",
+    "contactoTelefono": "999111222",
+    "contactoEmail": "juan@corp.com",
+    "fechaLlegada": "2026-06-10T00:00:00",
+    "fechaSalida": "2026-06-15T00:00:00",
+    "montoTotal": 2500.0,
+    "observaciones": null,
+    "createdAt": "2026-06-02T00:00:00",
+    "estado": "Activa",
+    "reservas": [
+      { "idReserva": 1, "idHabitacion": 1, "numeroHabitacion": "101", "estado": "Confirmada" }
+    ]
+  }
+]
+```
+
 ### GET /reserva-corporativa/{id}
 Auth: Si
 
+Response 200: Mismo shape que arriba, un solo objeto.
+
 ### POST /reserva-corporativa
 Auth: Si
+
+Request:
+```json
+{
+  "nombreEmpresa": "Corp SAC",
+  "contactoNombre": "Juan Perez",
+  "contactoTelefono": "999111222",
+  "contactoEmail": "juan@corp.com",
+  "fechaLlegada": "2026-06-10",
+  "fechaSalida": "2026-06-15",
+  "habitaciones": [
+    { "idHabitacion": 1, "precioPersonalizado": null },
+    { "idHabitacion": 3, "precioPersonalizado": 60.0 }
+  ],
+  "observaciones": "Facturar a nombre de Corp SAC"
+}
+```
 
 ### PUT /reserva-corporativa/{id}
 Auth: Si
 
 ### DELETE /reserva-corporativa/{id}
 Auth: Si
+
+Response 204: Sin contenido
 
 ### POST /reserva-corporativa/{id}/finalizar
 Auth: Si
@@ -668,6 +711,8 @@ Auth: Si
 
 ### GET /comprobante
 Auth: Si
+
+Query params: `?page=1&pageSize=10`
 
 Response 200:
 ```json
@@ -697,8 +742,22 @@ Response 200:
 ### GET /comprobante/{id}
 Auth: Si
 
+Response 200: Mismo shape que arriba, un solo objeto.
+
 ### POST /comprobante/{id}/enviar
 Auth: Si
+
+Request (body opcional):
+```json
+"usuarioSunat"
+```
+
+Response 200:
+```json
+{
+  "message": "Comprobante enviado a SUNAT exitosamente"
+}
+```
 
 ---
 
@@ -707,7 +766,7 @@ Auth: Si
 ### GET /pdf/Comprobante/{id}
 Auth: Si
 
-Response 200: `application/pdf`
+Response 200: `application/pdf` (archivo descargable)
 
 ### GET /pdf/Venta/{idVenta}
 Auth: Si
@@ -731,47 +790,241 @@ Response 200: `application/pdf`
 ### GET /reporte/cierre-caja
 Auth: Si
 
+Response 200:
+```json
+[
+  {
+    "fecha": "2026-06-02",
+    "totalHabitaciones": 500.0,
+    "totalConsumos": 25.5,
+    "totalVentas": 15.0,
+    "totalIngresos": 540.5,
+    "cantidadComprobantes": 1,
+    "cantidadEstancias": 1
+  }
+]
+```
+
 ### GET /reporte/estado-habitaciones
 Auth: Si
+
+Response 200:
+```json
+[
+  {
+    "numeroHabitacion": "101",
+    "tipoHabitacion": "Matrimonial",
+    "estado": "Disponible",
+    "precioNoche": 50.0,
+    "fechaUltimoCambio": "2026-06-02T10:11:45.2120028"
+  }
+]
+```
 
 ### GET /reporte/ocupacion-diaria
 Auth: Si
 
+Response 200:
+```json
+[
+  {
+    "fecha": "2026-06-02",
+    "totalHabitaciones": 8,
+    "ocupadas": 3,
+    "disponibles": 5,
+    "porcentajeOcupacion": 37.5
+  }
+]
+```
+
 ### GET /reporte/top-productos
 Auth: Si
+
+Response 200:
+```json
+[
+  {
+    "idProducto": 1,
+    "nombreProducto": "Agua Mineral 500ml",
+    "totalVendido": 50,
+    "totalIngresos": 125.0
+  }
+]
+```
 
 ---
 
 ## Catalogos (CRUD estandar)
 
-### GET /cat-estado-habitacion
-### GET /cat-estado-habitacion/{id}
-### POST /cat-estado-habitacion
-### PUT /cat-estado-habitacion/{id}
-### DELETE /cat-estado-habitacion/{id}
+Las rutas se generan con el nombre del controlador (PascalCase, aunque el ruteo es case-insensitive).
+Ejemplo: `CatEstadoHabitacion` o `cat-estado-habitacion` funcionan igual.
 
-### GET /cat-rol-usuario
-### GET /cat-rol-usuario/{id}
+### CatEstadoHabitacion
 
-### GET /cat-metodo-pago
-### GET /cat-metodo-pago/{codigo}
+**GET** (listar): `GET /cat-estado-habitacion`
+Auth: Si
 
-### GET /cat-tipo-documento
-### GET /cat-tipo-documento/{codigo}
+Response 200:
+```json
+[
+  { "idEstado": 1, "nombre": "Disponible", "descripcion": "Lista para ser ocupada" },
+  { "idEstado": 2, "nombre": "Ocupada", "descripcion": "Con huéspedes actualmente" },
+  { "idEstado": 3, "nombre": "Limpieza", "descripcion": "En proceso de limpieza" },
+  { "idEstado": 4, "nombre": "Mantenimiento", "descripcion": "Fuera de servicio" },
+  { "idEstado": 5, "nombre": "En Reserva", "descripcion": "Habitación reservada para hoy, esperando check-in" }
+]
+```
 
-### GET /cat-tipo-comprobante
-### GET /cat-tipo-comprobante/{codigo}
+**POST** (crear): `POST /cat-estado-habitacion`
+Request:
+```json
+{
+  "nombre": "Bloqueado",
+  "descripcion": "No disponible por orden administrativa",
+  "permiteCheckin": false,
+  "permiteCheckout": false,
+  "esEstadoFinal": false,
+  "colorUi": "#FF0000"
+}
+```
 
-### GET /cat-afectacion-igv
-### GET /cat-afectacion-igv/{codigo}
+**GET by ID**: `GET /cat-estado-habitacion/{id}`
 
-### GET /cat-estado-sunat
-### GET /cat-estado-sunat/{codigo}
+**PUT** (actualizar): `PUT /cat-estado-habitacion/{id}`
 
-### GET /tipos-habitacion
-### GET /tipos-habitacion/{id}
+**DELETE**: `DELETE /cat-estado-habitacion/{id}` (Response 204)
 
-### GET /categoria-producto
+### CatRolUsuario
+
+**GET** (listar): `GET /cat-rol-usuario`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "idRol": 1, "nombre": "Administrador" },
+  { "idRol": 2, "nombre": "Recepcionista" },
+  { "idRol": 3, "nombre": "Limpieza" }
+]
+```
+
+**GET by ID**: `GET /cat-rol-usuario/{id}`
+
+**POST**: `POST /cat-rol-usuario`
+```json
+{ "nombre": "Cajero" }
+```
+
+**PUT / DELETE**: Mismo patrón.
+
+### CatMetodoPago
+
+**GET** (listar): `GET /cat-metodo-pago`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "codigo": "001", "descripcion": "Depósito en cuenta" },
+  { "codigo": "005", "descripcion": "Efectivo" },
+  { "codigo": "006", "descripcion": "Tarjeta de Crédito / Débito" },
+  { "codigo": "008", "descripcion": "Transferencia bancaria (Yape/Plin)" },
+  { "codigo": "999", "descripcion": "Otros" }
+]
+```
+
+**GET by codigo**: `GET /cat-metodo-pago/{codigo}`
+
+### CatTipoDocumento
+
+**GET** (listar): `GET /cat-tipo-documento`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "codigo": "0", "descripcion": "Otros" },
+  { "codigo": "1", "descripcion": "DNI" },
+  { "codigo": "6", "descripcion": "RUC" },
+  { "codigo": "7", "descripcion": "Pasaporte" }
+]
+```
+
+### CatTipoComprobante
+
+**GET** (listar): `GET /cat-tipo-comprobante`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "codigo": "01", "descripcion": "Factura" },
+  { "codigo": "03", "descripcion": "Boleta de Venta" }
+]
+```
+
+### CatAfectacionIgv
+
+**GET** (listar): `GET /cat-afectacion-igv`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "codigo": "10", "descripcion": "Gravado - Operación Onerosa" },
+  { "codigo": "20", "descripcion": "Exonerado" },
+  { "codigo": "30", "descripcion": "Inafecto" },
+  { "codigo": "40", "descripcion": "Exportación" }
+]
+```
+
+### CatEstadoSunat
+
+**GET** (listar): `GET /cat-estado-sunat`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "codigo": 1, "descripcion": "Pendiente", "descripcionLarga": "El comprobante se generó pero no se ha enviado." },
+  { "codigo": 2, "descripcion": "Enviado", "descripcionLarga": "El comprobante fue enviado y se espera respuesta de SUNAT." },
+  { "codigo": 3, "descripcion": "Aceptado", "descripcionLarga": "El comprobante fue validado exitosamente por SUNAT." },
+  { "codigo": 4, "descripcion": "Rechazado", "descripcionLarga": "El comprobante fue RECHAZADO. No tiene validez tributaria." },
+  { "codigo": 5, "descripcion": "Observado", "descripcionLarga": "Aceptado con observaciones menores." },
+  { "codigo": 6, "descripcion": "Anulado", "descripcionLarga": "El comprobante fue dado de baja." }
+]
+```
+
+### TiposHabitacion
+
+**GET** (listar): `GET /tipos-habitacion`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "idTipo": 1, "nombre": "Matrimonial", "capacidad": 2, "descripcion": "Habitación estándar para dos personas", "precioBase": 50.0 },
+  { "idTipo": 2, "nombre": "Doble", "capacidad": 3, "descripcion": "Habitación con dos camas individuales", "precioBase": 70.0 },
+  { "idTipo": 3, "nombre": "Suite", "capacidad": 4, "descripcion": "Suite con sala de estar independiente", "precioBase": 120.0 }
+]
+```
+
+**GET by ID**: `GET /tipos-habitacion/{id}`
+
+### CategoriaProducto
+
+**GET** (listar): `GET /categoria-producto`
+Auth: Si
+
+Response 200:
+```json
+[
+  { "idCategoria": 1, "nombre": "Bebidas", "descripcion": "Bebidas alcohólicas y no alcohólicas", "mostrarEnVentas": true, "productos": [] },
+  { "idCategoria": 2, "nombre": "Snacks", "descripcion": "Snacks y piqueos", "mostrarEnVentas": true, "productos": [] },
+  { "idCategoria": 3, "nombre": "Servicios", "descripcion": "Servicios adicionales", "mostrarEnVentas": true, "productos": [] },
+  { "idCategoria": 4, "nombre": "Amenidades", "descripcion": "Artículos de cortesía en la habitación", "mostrarEnVentas": true, "productos": [] }
+]
+```
 
 ---
 
@@ -780,6 +1033,18 @@ Auth: Si
 ### GET /configuracion-hotel
 Auth: Si
 
+Response 200:
+```json
+{
+  "nombre": "Mi Hotel",
+  "direccion": "Av. Principal 123",
+  "telefono": "999-999-999",
+  "ruc": "12345678901",
+  "tasaIgvHotel": 18.0,
+  "tasaIgvProductos": 18.0
+}
+```
+
 ---
 
 ## Setup (solo desarrollo)
@@ -787,11 +1052,34 @@ Auth: Si
 ### GET /setup/estado
 Auth: No
 
+Response 200:
+```json
+{
+  "requiereInicializacion": false
+}
+```
+
 ### POST /setup/crear-admin
 Auth: No
 
+Crea el usuario administrador por defecto.
+Response 200:
+```json
+{
+  "message": "Administrador creado exitosamente"
+}
+```
+
 ### POST /setup/crear-usuarios-defecto
 Auth: No
+
+Crea usuarios: admin, recepcion, limpieza.
+Response 200:
+```json
+{
+  "message": "Usuarios por defecto creados/verificados exitosamente"
+}
+```
 
 ---
 
@@ -799,6 +1087,17 @@ Auth: No
 
 ### POST /backup/full
 Auth: Si
+
+Response 200:
+```json
+{
+  "fileName": "Full_20260602_164500.bak",
+  "filePath": "/backups/Full_20260602_164500.bak",
+  "sizeBytes": 1048576,
+  "tipo": "Full",
+  "fechaCreacion": "2026-06-02T16:45:00"
+}
+```
 
 ### POST /backup/differential
 Auth: Si
@@ -809,8 +1108,15 @@ Auth: Si
 ### GET /backup/history
 Auth: Si
 
+Response 200:
+```json
+[]
+```
+
 ### GET /backup/download/{fileName}
 Auth: Si
+
+Response 200: `application/octet-stream`
 
 ---
 
@@ -825,8 +1131,27 @@ Response 200: `Healthy`
 
 ## Notas
 
-- **TipoDocumento** acepta tanto codigos ("1", "6", "7", "0") como nombres ("DNI", "RUC", "Pasaporte", "Otros")
-- **MetodoPago:** "005"=Efectivo, "006"=Tarjeta, "008"=Yape/Plin, "001"=Deposito, "999"=Otros
-- **Usuario predefinido:** admin / Admin123! (Rol: Administrador)
-- **Usuarios predefinidos:** recepcion / Recepcion123! (Rol: Recepcionista), limpieza / Limpieza123! (Rol: Limpieza)
-- Errores con formato ProblemDetails (RFC 7807)
+### Convencion de rutas
+- Las URLs usan kebab-case en esta documentacion, pero el ruteo es case-insensitive.
+- Ejemplo: `/api/v1/cat-estado-habitacion` ≡ `/api/v1/CatEstadoHabitacion`
+- Los valores en JSON siempre usan PascalCase (propiedades C#).
+
+### TipoDocumento
+Acepta tanto codigos ("1", "6", "7", "0") como nombres ("DNI", "RUC", "Pasaporte", "Otros"). El API normaliza automaticamente.
+
+### MetodoPago
+- `"005"` = Efectivo
+- `"006"` = Tarjeta de Credito/Debito
+- `"008"` = Yape/Plin / Transferencia
+- `"001"` = Deposito en cuenta
+- `"999"` = Otros
+
+### Usuarios predefinidos
+| Usuario | Password | Rol |
+|---------|----------|-----|
+| admin | Admin123! | Administrador |
+| recepcion | Recepcion123! | Recepcionista |
+| limpieza | Limpieza123! | Limpieza |
+
+### Errores
+Todas las responses de error usan formato ProblemDetails (RFC 7807):
