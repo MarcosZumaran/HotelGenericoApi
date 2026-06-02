@@ -707,4 +707,16 @@ CREATE INDEX ix_traslado_estancia ON historial_traslado(id_estancia);
 CREATE INDEX ix_traslado_fecha ON historial_traslado(fecha_traslado DESC);
 GO
 
+-- Script SQL para agregar características y tabla de amenidades por habitación
+ALTER TABLE habitacion ADD caracteristicas NVARCHAR(MAX) NULL;
+
+CREATE TABLE habitacion_amenidad (
+    id_habitacion_amenidad INT PRIMARY KEY IDENTITY(1,1),
+    id_habitacion INT NOT NULL REFERENCES habitacion(id_habitacion),
+    id_producto INT NOT NULL REFERENCES producto(id_producto),
+    cantidad_base INT NOT NULL DEFAULT 1,
+    CONSTRAINT uq_habitacion_amenidad UNIQUE (id_habitacion, id_producto)
+);
+GO
+
 PRINT 'Base de datos HotelDB creada con éxito.';
