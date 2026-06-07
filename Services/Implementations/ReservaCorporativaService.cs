@@ -68,7 +68,7 @@ public class ReservaCorporativaService : IReservaCorporativaService
             .ToListAsync();
 
         var estanciasActivas = await _db.Estancias
-            .Where(e => e.IdReservaCorporativa == id && e.Estado == EstadoEstanciaCodigo.Code.Activa)
+            .Where(e => e.IdReservaCorporativa == id && e.IdEstadoEstanciaNavigation.Codigo == EstadoEstanciaCodigo.Code.Activa)
             .ToListAsync();
 
         var habitacionesDto = reservasIndividuales.Select(r => new HabitacionResumenDto

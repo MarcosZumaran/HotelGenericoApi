@@ -53,7 +53,7 @@ public class TrasladoHabitacionService : ITrasladoHabitacionService
 
         var estanciaSuperpuesta = await _db.Estancias
             .AnyAsync(e => e.IdHabitacion == dto.NuevaHabitacionId &&
-                        e.Estado == EstadoEstanciaCodigo.Code.Activa &&
+                        e.IdEstadoEstanciaNavigation.Codigo == EstadoEstanciaCodigo.Code.Activa &&
                         e.FechaCheckin < estancia.FechaCheckoutPrevista &&
                         e.FechaCheckoutPrevista > estancia.FechaCheckin);
         if (estanciaSuperpuesta)

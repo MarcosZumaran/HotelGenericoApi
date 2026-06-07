@@ -170,7 +170,7 @@ public class HabitacionService : IHabitacionService
                 .Include(h => h.IdEstadoNavigation)
                 .Include(h => h.Estancias.Where(e => e.FechaCheckoutReal == null))
                     .ThenInclude(e => e.IdClienteTitularNavigation)
-                .Include(h => h.Reservas.Where(r => r.Estado == EstadoReservaCodigo.Code.Confirmada && r.FechaEntradaPrevista >= hoy && r.FechaEntradaPrevista < hoy.AddDays(1)))
+                .Include(h => h.Reservas.Where(r => r.IdEstadoReservaNavigation.Codigo == EstadoReservaCodigo.Code.Confirmada && r.FechaEntradaPrevista >= hoy && r.FechaEntradaPrevista < hoy.AddDays(1)))
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -233,12 +233,12 @@ public class HabitacionService : IHabitacionService
     {
         var todas = await GetEstadoActualAsync();
         var idsOcupadas = await _db.Reservas
-            .Where(r => r.Estado != EstadoReservaCodigo.Code.Cancelada &&
+            .Where(r => r.IdEstadoReservaNavigation.Codigo != EstadoReservaCodigo.Code.Cancelada &&
                         r.FechaEntradaPrevista < fechaSalida &&
                         r.FechaSalidaPrevista > fechaEntrada)
             .Select(r => r.IdHabitacion)
             .Union(_db.Estancias
-                .Where(e => e.Estado == EstadoEstanciaCodigo.Code.Activa &&
+                .Where(e => e.IdEstadoEstanciaNavigation.Codigo == EstadoEstanciaCodigo.Code.Activa &&
                             e.FechaCheckin < fechaSalida &&
                             e.FechaCheckoutPrevista > fechaEntrada)
                 .Select(e => e.IdHabitacion))

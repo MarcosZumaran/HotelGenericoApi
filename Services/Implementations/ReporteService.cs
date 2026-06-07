@@ -44,12 +44,13 @@ public class ReporteService : IReporteService
     public async Task<List<TopProductoDto>> GetTopProductosAsync(int dias)
     {
         var fechaLimite = DateTime.UtcNow.AddDays(-dias);
+        _logger.LogInformation("[Backend-Debug] GetTopProductosAsync — dias={Dias}, fechaLimite={FechaLimite:yyyy-MM-dd}", dias, fechaLimite);
 
         try
         {
             return await _db.ItemsVenta
-                .Where(iv => iv.Venta!.FechaVenta >= fechaLimite)
-                .GroupBy(iv => iv.Producto!.Nombre)
+                .Where(iv => iv.IdVentaNavigation.FechaVenta >= fechaLimite)
+                .GroupBy(iv => iv.IdProductoNavigation.Nombre)
                 .Select(g => new TopProductoDto
                 {
                     Nombre = g.Key,

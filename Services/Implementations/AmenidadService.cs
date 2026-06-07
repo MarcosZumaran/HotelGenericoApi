@@ -129,7 +129,7 @@ public class AmenidadService : IAmenidadService
         if (dto.EsCargableAlHuésped)
         {
             var estanciaActiva = await _db.Estancias
-                .FirstOrDefaultAsync(e => e.IdHabitacion == idHabitacion && e.Estado == EstadoEstanciaCodigo.Code.Activa && e.FechaCheckoutReal == null);
+                .FirstOrDefaultAsync(e => e.IdHabitacion == idHabitacion && e.IdEstadoEstanciaNavigation.Codigo == EstadoEstanciaCodigo.Code.Activa && e.FechaCheckoutReal == null);
 
             if (estanciaActiva == null)
                 throw new InvalidOperationException("No hay una estancia activa para esta habitación.");
