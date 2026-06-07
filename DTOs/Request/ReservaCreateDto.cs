@@ -10,7 +10,7 @@ public sealed record ReservaCreateDto
     public string? Telefono { get; init; }
     public DateTime FechaEntradaPrevista { get; init; }
     public DateTime FechaSalidaPrevista { get; init; }
-    public string MetodoPago { get; init; } = "005";
+    public string MetodoPago { get; init; } = Constants.MetodoPagoCodigo.Efectivo;
     public bool UsarClienteAnonimo { get; init; } = false;
     public bool GuardarCliente { get; set; } = true;
     public int? IdClienteExistente { get; set; }

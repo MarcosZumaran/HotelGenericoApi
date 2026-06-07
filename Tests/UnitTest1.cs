@@ -37,7 +37,8 @@ public class EstanciaServiceTests
         clientsMock.Setup(c => c.All).Returns(clientProxyMock.Object);
         var hubMock = new Mock<IHubContext<HotelGenericoApi.Hubs.HabitacionHub>>();
         hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
-        return new CheckoutService(db, CreateMockLogger<CheckoutService>(), hubMock.Object);
+        var configCacheMock = new Mock<IConfiguracionCacheService>();
+        return new CheckoutService(db, CreateMockLogger<CheckoutService>(), hubMock.Object, configCacheMock.Object);
     }
 
     private ConsumoEstanciaService CreateConsumoService(HotelDbContext db)

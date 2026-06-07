@@ -7,16 +7,16 @@ namespace HotelGenericoApi.Services.Implementations;
 
 public class ConfiguracionHotelService : IConfiguracionHotelService
 {
-    private readonly HotelDbContext _db;
+    private readonly IConfiguracionCacheService _configCache;
 
-    public ConfiguracionHotelService(HotelDbContext db)
+    public ConfiguracionHotelService(IConfiguracionCacheService configCache)
     {
-        _db = db;
+        _configCache = configCache;
     }
 
     public async Task<ConfiguracionHotelResponseDto> GetConfiguracionAsync()
     {
-        var config = await _db.Configuraciones.FirstOrDefaultAsync();
+        var config = await _configCache.GetConfiguracionAsync();
 
         return config is not null
             ? new ConfiguracionHotelResponseDto(

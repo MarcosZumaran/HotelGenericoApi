@@ -23,32 +23,26 @@ public class ReservaCorporativaService : IReservaCorporativaService
 
     public async Task<IEnumerable<ReservaCorporativaResponseDto>> GetAllAsync()
     {
-        var reservas = await _db.ReservasCorporativas
-            .Include(r => r.IdClienteEmpresaNavigation)
-            .Include(r => r.Estancias)
-                .ThenInclude(e => e.ItemsEstancia)
+        return await _db.ReservasCorporativas
             .AsNoTracking()
+            .Select(r => new ReservaCorporativaResponseDto
+            {
+                IdReservaCorporativa = r.IdReservaCorporativa,
+                IdClienteEmpresa = r.IdClienteEmpresa,
+                NombreEmpresa = r.ClienteEmpresa != null ? r.ClienteEmpresa.Nombres + " " + r.ClienteEmpresa.Apellidos : "",
+                RucEmpresa = r.ClienteEmpresa != null ? r.ClienteEmpresa.Documento : "",
+                FechaInicio = r.FechaInicio.ToDateTime(TimeOnly.MinValue),
+                FechaFin = r.FechaFin.ToDateTime(TimeOnly.MinValue),
+                NumeroHabitaciones = r.NumeroHabitaciones,
+                HabitacionesOcupadas = r.Estancias.Count(e => e.Estado == EstadoEstanciaCodigo.Code.Activa),
+                Estado = r.Estado,
+                TotalAcumulado = r.Estancias
+                    .Where(e => e.FechaCheckoutReal != null)
+                    .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal.GetValueOrDefault()) : 0)),
+                Observaciones = r.Observaciones,
+                FechaRegistro = r.FechaRegistro
+            })
             .ToListAsync();
-
-        var result = reservas.Select(r => new ReservaCorporativaResponseDto
-        {
-            IdReservaCorporativa = r.IdReservaCorporativa,
-            IdClienteEmpresa = r.IdClienteEmpresa,
-            NombreEmpresa = r.ClienteEmpresa != null ? $"{r.ClienteEmpresa.Nombres} {r.ClienteEmpresa.Apellidos}" : "",
-            RucEmpresa = r.ClienteEmpresa != null ? r.ClienteEmpresa.Documento : "",
-            FechaInicio = r.FechaInicio.ToDateTime(TimeOnly.MinValue),
-            FechaFin = r.FechaFin.ToDateTime(TimeOnly.MinValue),
-            NumeroHabitaciones = r.NumeroHabitaciones,
-            HabitacionesOcupadas = r.Estancias.Count(e => e.Estado == EstadoEstanciaCodigo.Code.Activa),
-            Estado = r.Estado,
-            TotalAcumulado = r.Estancias
-                .Where(e => e.FechaCheckoutReal != null)
-                .Sum(e => e.MontoTotal + (e.ItemsEstancia != null ? e.ItemsEstancia.Sum(i => i.Subtotal.GetValueOrDefault()) : 0)),
-            Observaciones = r.Observaciones,
-            FechaRegistro = r.FechaRegistro
-        });
-
-        return result;
     }
 
     public async Task<ReservaCorporativaResponseDto?> GetByIdAsync(int id)

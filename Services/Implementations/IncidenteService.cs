@@ -4,6 +4,7 @@ using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Services.Interfaces;
 using ImageMagick;
 
@@ -44,6 +45,54 @@ public class IncidenteService : IIncidenteService
                 ImagenUrl = i.ImagenUrl
             })
             .ToListAsync();
+    }
+
+    public async Task<PagedResult<IncidenteResponseDto>> GetPagedIncidentesAsync(int page, int pageSize)
+    {
+        var query = _db.Incidentes
+            .Include(i => i.IdHabitacionNavigation)
+            .Include(i => i.ReportadoPorNavigation)
+            .OrderByDescending(i => i.FechaRegistro)
+            .AsNoTracking()
+            .Select(i => new IncidenteResponseDto
+            {
+                IdIncidente = i.IdIncidente,
+                IdEstancia = i.IdEstancia,
+                IdHabitacion = i.IdHabitacion,
+                NumeroHabitacion = i.IdHabitacionNavigation != null ? i.IdHabitacionNavigation.NumeroHabitacion : "",
+                Tipo = i.Tipo,
+                Descripcion = i.Descripcion,
+                CostoEstimado = i.CostoEstimado,
+                CobradoAlCliente = i.CobradoAlCliente,
+                Resuelto = i.Resuelto,
+                FechaRegistro = i.FechaRegistro,
+                ReportadoPorNombre = i.ReportadoPorNavigation != null ? i.ReportadoPorNavigation.Username : null,
+                ImagenUrl = i.ImagenUrl
+            });
+        return await query.ToPagedResultAsync(page, pageSize);
+    }
+
+    public async Task<PagedResult<ObjetoPerdidoResponseDto>> GetPagedObjetosPerdidosAsync(int page, int pageSize)
+    {
+        var query = _db.ObjetosPerdidos
+            .Include(o => o.IdHabitacionNavigation)
+            .Include(o => o.IdEstanciaNavigation)
+            .OrderByDescending(o => o.FechaHallazgo)
+            .AsNoTracking()
+            .Select(o => new ObjetoPerdidoResponseDto
+            {
+                IdObjeto = o.IdObjeto,
+                IdHabitacion = o.IdHabitacion,
+                NumeroHabitacion = o.IdHabitacionNavigation != null ? o.IdHabitacionNavigation.NumeroHabitacion : null,
+                IdEstancia = o.IdEstancia,
+                Descripcion = o.Descripcion,
+                FechaHallazgo = o.FechaHallazgo,
+                Estado = o.Estado,
+                EntregadoA = o.EntregadoA,
+                FechaEntregado = o.FechaEntregado,
+                ImagenUrl = o.ImagenUrl
+            });
+        return await query.ToPagedResultAsync(page, pageSize);
     }
 
     public async Task<IncidenteResponseDto?> GetIncidenteByIdAsync(int id)

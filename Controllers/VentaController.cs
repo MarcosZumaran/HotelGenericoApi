@@ -23,10 +23,12 @@ public class VentaController : ControllerBase
 
     /// <summary>Obtiene todas las ventas registradas.</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<VentaResponseDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<VentaResponseDto>>> GetAll()
+    [ProducesResponseType(typeof(PagedResult<VentaResponseDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<VentaResponseDto>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var ventas = await _ventaService.GetAllAsync();
+        var ventas = await _ventaService.GetPagedAsync(page, pageSize);
         return Ok(ventas);
     }
 

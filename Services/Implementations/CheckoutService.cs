@@ -14,15 +14,18 @@ public class CheckoutService : ICheckoutService
     private readonly HotelDbContext _db;
     private readonly ILogger<CheckoutService> _logger;
     private readonly IHubContext<HabitacionHub> _hubContext;
+    private readonly IConfiguracionCacheService _configCache;
 
     public CheckoutService(
         HotelDbContext db,
         ILogger<CheckoutService> logger,
-        IHubContext<HabitacionHub> hubContext)
+        IHubContext<HabitacionHub> hubContext,
+        IConfiguracionCacheService configCache)
     {
         _db = db;
         _logger = logger;
         _hubContext = hubContext;
+        _configCache = configCache;
     }
 
     public async Task<CheckoutResultDto> RealizarCheckoutAsync(int estanciaId, int idUsuario)
@@ -133,7 +136,7 @@ public class CheckoutService : ICheckoutService
 
     private async Task<decimal> ObtenerIgvHotelAsync()
     {
-        var config = await _db.Configuraciones.FirstOrDefaultAsync();
+        var config = await _configCache.GetConfiguracionAsync();
         return config?.TasaIgvHotel > 0 ? config.TasaIgvHotel / 100m : 0.18m;
     }
 

@@ -21,10 +21,12 @@ public class ReservaController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(List<ReservaResponseDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<ReservaResponseDto>>> GetAll()
+    [ProducesResponseType(typeof(PagedResult<ReservaResponseDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<ReservaResponseDto>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var reservas = await _reservaQueryService.GetAllAsync();
+        var reservas = await _reservaQueryService.GetPagedAsync(page, pageSize);
         return Ok(reservas);
     }
 }

@@ -88,7 +88,7 @@ public class PdfService : IPdfService
                 : "CLIENTE ANÓNIMO",
             ClienteDocumentoNum = estancia.ClienteTitular?.Documento ?? "—",
             TipoComprobante = "03",
-            MetodoPago = "005"
+            MetodoPago = Constants.MetodoPagoCodigo.Efectivo
         };
 
         string numeroHabitacion = estancia.Habitacion?.NumeroHabitacion ?? "—";

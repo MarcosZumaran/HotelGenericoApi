@@ -64,6 +64,10 @@ public static class ServiceExtensions
         // HttpClient tipificado para RENIEC
         services.AddHttpClient<IReniecService, ReniecService>();
 
+        // Caché
+        services.AddMemoryCache();
+        services.AddScoped<IConfiguracionCacheService, ConfiguracionCacheService>();
+
         // Setup y transacciones
         services.AddScoped<SetupService>();
         services.AddScoped<IDbTransactionManager, SqlServerTransactionManager>();

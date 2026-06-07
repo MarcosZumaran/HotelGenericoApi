@@ -982,8 +982,8 @@ GO
 
 IF NOT EXISTS (SELECT 1 FROM dbo.rol_usuario WHERE nombre = N'Administrador')
     INSERT INTO dbo.rol_usuario (nombre) VALUES (N'Administrador');
-IF NOT EXISTS (SELECT 1 FROM dbo.rol_usuario WHERE nombre = N'Recepcionista')
-    INSERT INTO dbo.rol_usuario (nombre) VALUES (N'Recepcionista');
+IF NOT EXISTS (SELECT 1 FROM dbo.rol_usuario WHERE nombre = N'Recepcion')
+    INSERT INTO dbo.rol_usuario (nombre) VALUES (N'Recepcion');
 IF NOT EXISTS (SELECT 1 FROM dbo.rol_usuario WHERE nombre = N'Limpieza')
     INSERT INTO dbo.rol_usuario (nombre) VALUES (N'Limpieza');
 GO

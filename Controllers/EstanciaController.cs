@@ -47,10 +47,12 @@ public class EstanciaController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(List<Estancia>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<Estancia>>> GetAll()
+    [ProducesResponseType(typeof(PagedResult<Estancia>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<Estancia>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var estancias = await _queryService.GetAllAsync();
+        var estancias = await _queryService.GetPagedAsync(page, pageSize);
         return Ok(estancias);
     }
 
@@ -58,8 +60,7 @@ public class EstanciaController : ControllerBase
     [ProducesResponseType(typeof(List<Estancia>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<Estancia>>> GetActivas()
     {
-        var estancias = await _queryService.GetAllAsync();
-        var activas = estancias.Where(e => e.IdEstadoEstancia == EstadoEstanciaCodigo.Activa).ToList();
+        var activas = await _queryService.GetActivasAsync();
         return Ok(activas);
     }
 

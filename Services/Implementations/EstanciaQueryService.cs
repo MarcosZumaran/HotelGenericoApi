@@ -3,6 +3,7 @@ using HotelGenericoApi.Constants;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Services.Interfaces;
 
 namespace HotelGenericoApi.Services.Implementations;
@@ -21,6 +22,25 @@ public class EstanciaQueryService : IEstanciaQueryService
         return await _db.Estancias
             .Include(e => e.IdHabitacionNavigation).ThenInclude(h => h.IdTipoNavigation)
             .Include(e => e.IdClienteTitularNavigation)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<PagedResult<Estancia>> GetPagedAsync(int page, int pageSize)
+    {
+        var query = _db.Estancias
+            .Include(e => e.IdHabitacionNavigation).ThenInclude(h => h.IdTipoNavigation)
+            .Include(e => e.IdClienteTitularNavigation)
+            .AsNoTracking();
+        return await query.ToPagedResultAsync(page, pageSize);
+    }
+
+    public async Task<List<Estancia>> GetActivasAsync()
+    {
+        return await _db.Estancias
+            .Include(e => e.IdHabitacionNavigation).ThenInclude(h => h.IdTipoNavigation)
+            .Include(e => e.IdClienteTitularNavigation)
+            .Where(e => e.IdEstadoEstancia == EstadoEstanciaCodigo.Activa)
             .AsNoTracking()
             .ToListAsync();
     }

@@ -10,6 +10,7 @@ using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Mappings;
 using HotelGenericoApi.Services.Interfaces;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Models.Exceptions;
 
@@ -45,6 +46,22 @@ public class UsuarioService : IUsuarioService
             u.EstaActivo,
             u.FechaCreacion
         ));
+    }
+
+    public async Task<PagedResult<UsuarioResponseDto>> GetPagedAsync(int page, int pageSize)
+    {
+        var query = _db.Usuarios
+            .Include(u => u.IdRolNavigation)
+            .AsNoTracking()
+            .Select(u => new UsuarioResponseDto(
+                u.IdUsuario,
+                u.Username,
+                u.IdRol,
+                u.Rol!.Nombre ?? "",
+                u.EstaActivo,
+                u.FechaCreacion
+            ));
+        return await query.ToPagedResultAsync(page, pageSize);
     }
 
     public async Task<UsuarioResponseDto?> GetByIdAsync(int id)

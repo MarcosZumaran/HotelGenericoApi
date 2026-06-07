@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize(Roles = "Administrador")]
 public class LuaTestController : ControllerBase
 {
     private readonly ILuaService _lua;

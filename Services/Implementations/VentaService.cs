@@ -4,6 +4,7 @@ using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Services.Interfaces;
 
 namespace HotelGenericoApi.Services.Implementations;
@@ -12,11 +13,13 @@ public class VentaService : IVentaService
 {
     private readonly HotelDbContext _db;
     private readonly ILogger<VentaService> _logger;
+    private readonly IConfiguracionCacheService _configCache;
 
-    public VentaService(HotelDbContext db, ILogger<VentaService> logger)
+    public VentaService(HotelDbContext db, ILogger<VentaService> logger, IConfiguracionCacheService configCache)
     {
         _db = db;
         _logger = logger;
+        _configCache = configCache;
     }
 
     public async Task<List<VentaResponseDto>> GetAllAsync()
@@ -50,6 +53,46 @@ public class VentaService : IVentaService
                 }).ToList()
             })
             .ToListAsync();
+    }
+
+    public async Task<PagedResult<VentaResponseDto>> GetPagedAsync(int page, int pageSize)
+    {
+        var query = _db.Ventas
+            .Include(v => v.IdClienteNavigation)
+            .Include(v => v.MetodoPagoNavigation)
+            .Include(v => v.ItemVenta).ThenInclude(i => i.IdProductoNavigation)
+            .AsNoTracking()
+            .OrderByDescending(v => v.FechaVenta);
+        var paged = await query.ToPagedResultAsync(page, pageSize);
+        var dtos = paged.Items.Select(v => new VentaResponseDto
+        {
+            IdVenta = v.IdVenta,
+            IdCliente = v.IdCliente,
+            ClienteNombre = v.IdClienteNavigation != null
+                ? $"{v.IdClienteNavigation.Nombres} {v.IdClienteNavigation.Apellidos}"
+                : null,
+            FechaVenta = v.FechaVenta,
+            Total = v.Total,
+            MetodoPago = v.MetodoPagoNavigation != null
+                ? v.MetodoPagoNavigation.Descripcion
+                : v.MetodoPago,
+            Items = v.ItemVenta.Select(i => new ItemVentaResponseDto
+            {
+                IdItem = i.IdItem,
+                IdProducto = i.IdProducto,
+                NombreProducto = i.IdProductoNavigation != null ? i.IdProductoNavigation.Nombre : null,
+                Cantidad = i.Cantidad,
+                PrecioUnitario = i.PrecioUnitario,
+                Subtotal = i.Subtotal.GetValueOrDefault()
+            }).ToList()
+        }).ToList();
+        return new PagedResult<VentaResponseDto>
+        {
+            Items = dtos,
+            TotalItems = paged.TotalItems,
+            Page = paged.Page,
+            PageSize = paged.PageSize
+        };
     }
 
     public async Task<VentaResponseDto?> GetByIdAsync(int id)
@@ -208,7 +251,7 @@ public class VentaService : IVentaService
 
     private async Task<decimal> ObtenerIgvProductoAsync()
     {
-        var config = await _db.Configuraciones.FirstOrDefaultAsync();
+        var config = await _configCache.GetConfiguracionAsync();
         return config?.TasaIgvProductos > 0 ? config.TasaIgvProductos / 100m : 0.18m;
     }
 

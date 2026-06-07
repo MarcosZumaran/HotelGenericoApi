@@ -4,7 +4,7 @@ services:
     container_name: hotel-sqlserver
     environment:
       ACCEPT_EULA: "Y"
-      SA_PASSWORD: "${SA_PASSWORD:-Mar703server}"
+      SA_PASSWORD: "${SA_PASSWORD}"
       MSSQL_PID: Express
     ports:
       - "1433:1433"
@@ -21,8 +21,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=HotelDB;User Id=sa;Password=${SA_PASSWORD:-Mar703server};TrustServerCertificate=True
-      - Jwt__Key=${JWT_KEY:-obTi6lRmI72jFEi+dLHYrKpETi5wm6Dy2H6qMvY0O3A=}
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=HotelDB;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True
+      - Jwt__Key=${JWT_KEY}
       - Jwt__Issuer=HotelGenericoApi
       - Jwt__Audience=HotelGenericoApiClient
       - VerificaPE__ApiKey=${VERIFICAPE_API_KEY}

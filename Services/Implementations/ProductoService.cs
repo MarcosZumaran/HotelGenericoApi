@@ -3,6 +3,7 @@ using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Mappings;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Services.Interfaces;
 using HotelGenericoApi.Models;
 
@@ -29,6 +30,22 @@ public class ProductoService : IProductoService
             .ToListAsync();
 
         return entities.Select(MapToResponse);
+    }
+
+    public async Task<PagedResult<ProductoResponseDto>> GetPagedAsync(int page, int pageSize)
+    {
+        var query = _db.Productos
+            .Include(p => p.IdAfectacionIgvNavigation)
+            .AsNoTracking();
+        var paged = await query.ToPagedResultAsync(page, pageSize);
+        var dtos = paged.Items.Select(MapToResponse).ToList();
+        return new PagedResult<ProductoResponseDto>
+        {
+            Items = dtos,
+            TotalItems = paged.TotalItems,
+            Page = paged.Page,
+            PageSize = paged.PageSize
+        };
     }
 
     public async Task<ProductoResponseDto?> GetByIdAsync(int id)

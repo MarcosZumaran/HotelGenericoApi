@@ -22,9 +22,11 @@ public class IncidenteController : ControllerBase
     // INCIDENTES
 
     [HttpGet("incidentes")]
-    public async Task<IActionResult> GetAllIncidentes()
+    public async Task<IActionResult> GetAllIncidentes(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var incidentes = await _incidenteService.GetAllIncidentesAsync();
+        var incidentes = await _incidenteService.GetPagedIncidentesAsync(page, pageSize);
         return Ok(incidentes);
     }
 
@@ -81,9 +83,11 @@ public class IncidenteController : ControllerBase
     // OBJETOS PERDIDOS
 
     [HttpGet("objetos")]
-    public async Task<IActionResult> GetAllObjetos()
+    public async Task<IActionResult> GetAllObjetos(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var objetos = await _incidenteService.GetAllObjetosPerdidosAsync();
+        var objetos = await _incidenteService.GetPagedObjetosPerdidosAsync(page, pageSize);
         return Ok(objetos);
     }
 

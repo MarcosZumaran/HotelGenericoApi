@@ -7,6 +7,7 @@ using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.Constants;
 using HotelGenericoApi.Hubs;
 using HotelGenericoApi.Models;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Services.Interfaces;
 
 namespace HotelGenericoApi.Services.Implementations;
@@ -33,6 +34,15 @@ public class HabitacionService : IHabitacionService
             .Include(h => h.IdEstadoNavigation)
             .AsNoTracking()
             .ToListAsync();
+    }
+
+    public async Task<PagedResult<Habitacion>> GetPagedAsync(int page, int pageSize)
+    {
+        var query = _db.Habitaciones
+            .Include(h => h.IdTipoNavigation)
+            .Include(h => h.IdEstadoNavigation)
+            .AsNoTracking();
+        return await query.ToPagedResultAsync(page, pageSize);
     }
 
     public async Task<Habitacion?> GetByIdAsync(int id)

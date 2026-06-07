@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using HotelGenericoApi.DTOs.Request;
+using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -23,10 +24,12 @@ public class UsuarioController : ControllerBase
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<DTOs.Response.UsuarioResponseDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll()
+    [ProducesResponseType(typeof(PagedResult<DTOs.Response.UsuarioResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var result = await _service.GetAllAsync();
+        var result = await _service.GetPagedAsync(page, pageSize);
         return Ok(result);
     }
 

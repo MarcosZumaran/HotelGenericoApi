@@ -7,6 +7,7 @@ namespace HotelGenericoApi.Services.Interfaces
     public interface IHabitacionService
     {
         Task<List<Habitacion>> GetAllAsync();
+        Task<PagedResult<Habitacion>> GetPagedAsync(int page, int pageSize);
         Task<Habitacion?> GetByIdAsync(int id);
         Task<Habitacion> CreateAsync(Habitacion habitacion);
         Task<Habitacion?> UpdateAsync(int id, Habitacion habitacionActualizada);

@@ -15,7 +15,9 @@ public class ProductoController : ControllerBase
     public ProductoController(IProductoService service) => _service = service;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20) => Ok(await _service.GetPagedAsync(page, pageSize));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)

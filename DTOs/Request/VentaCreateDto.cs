@@ -8,7 +8,7 @@ public sealed record VentaCreateDto
 
     [Required(ErrorMessage = "El método de pago es obligatorio.")]
     [StringLength(3, MinimumLength = 3)]
-    public string MetodoPago { get; init; } = "005";
+    public string MetodoPago { get; init; } = Constants.MetodoPagoCodigo.Efectivo;
 
     [MinLength(1, ErrorMessage = "Debe incluir al menos un producto.")]
     public List<ItemVentaCreateDto> Items { get; init; } = new();

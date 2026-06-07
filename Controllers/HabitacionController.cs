@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
+using HotelGenericoApi.Extensions;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Interfaces;
 
@@ -25,10 +26,12 @@ public class HabitacionController : ControllerBase
 
     /// <summary>Obtiene todas las habitaciones registradas.</summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<Habitacion>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<Habitacion>>> GetAll()
+    [ProducesResponseType(typeof(PagedResult<Habitacion>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<Habitacion>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var habitaciones = await _habitacionService.GetAllAsync();
+        var habitaciones = await _habitacionService.GetPagedAsync(page, pageSize);
         return Ok(habitaciones);
     }
 
