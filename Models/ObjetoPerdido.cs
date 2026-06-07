@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -27,7 +28,9 @@ public partial class ObjetoPerdido
 
     public virtual Habitacion? IdHabitacionNavigation { get; set; }
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public Habitacion? Habitacion => IdHabitacionNavigation;
+    [NotMapped]
     public Estancia? Estancia => IdEstanciaNavigation;
 }

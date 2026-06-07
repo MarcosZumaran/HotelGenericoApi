@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -51,7 +52,9 @@ public partial class Habitacion
 
     public virtual Usuario? UsuarioCambioNavigation { get; set; }
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public TipoHabitacion? Tipo => IdTipoNavigation;
+    [NotMapped]
     public string? Estado => IdEstadoNavigation?.Nombre;
 }

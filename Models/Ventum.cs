@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -29,7 +30,9 @@ public partial class Ventum
 
     public virtual ICollection<MovimientoStock> MovimientoStocks { get; set; } = new List<MovimientoStock>();
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public Cliente? Cliente => IdClienteNavigation;
+    [NotMapped]
     public ICollection<ItemVentum> ItemsVenta => ItemVenta;
 }

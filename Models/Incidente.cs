@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -33,7 +34,9 @@ public partial class Incidente
 
     public virtual Usuario? ReportadoPorNavigation { get; set; }
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public Habitacion? Habitacion => IdHabitacionNavigation;
+    [NotMapped]
     public Usuario? UsuarioReporte => ReportadoPorNavigation;
 }

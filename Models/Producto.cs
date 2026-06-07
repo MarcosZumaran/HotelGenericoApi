@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -49,6 +50,7 @@ public partial class Producto
 
     public virtual ICollection<StockHabitacion> StockHabitacions { get; set; } = new List<StockHabitacion>();
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public AfectacionIgv? AfectacionIgv => IdAfectacionIgvNavigation;
 }

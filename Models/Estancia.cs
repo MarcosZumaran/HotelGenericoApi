@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -59,8 +60,11 @@ public partial class Estancia
 
     public virtual ICollection<ObjetoPerdido> ObjetoPerdidos { get; set; } = new List<ObjetoPerdido>();
 
-    // Convenience navigation properties for backward compatibility
+    // Convenience navigation properties for backward compatibility (excluded from EF mapping)
+    [NotMapped]
     public Habitacion? Habitacion => IdHabitacionNavigation;
+    [NotMapped]
     public Cliente? ClienteTitular => IdClienteTitularNavigation;
+    [NotMapped]
     public string? Estado => IdEstadoEstanciaNavigation?.Codigo;
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -35,6 +36,7 @@ public partial class Usuario
 
     public virtual ICollection<Ventum> Venta { get; set; } = new List<Ventum>();
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public RolUsuario? Rol => IdRolNavigation;
 }

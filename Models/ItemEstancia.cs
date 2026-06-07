@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -23,7 +24,9 @@ public partial class ItemEstancia
 
     public virtual Producto IdProductoNavigation { get; set; } = null!;
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public Estancia? Estancia => IdEstanciaNavigation;
+    [NotMapped]
     public Producto? Producto => IdProductoNavigation;
 }

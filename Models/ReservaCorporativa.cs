@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
 
@@ -27,6 +28,7 @@ public partial class ReservaCorporativa
 
     public virtual ICollection<Reserva> Reservas { get; set; } = new List<Reserva>();
 
-    // Convenience navigation properties
+    // Convenience navigation properties (excluded from EF mapping)
+    [NotMapped]
     public Cliente? ClienteEmpresa => IdClienteEmpresaNavigation;
 }
