@@ -161,58 +161,72 @@ public class HabitacionService : IHabitacionService
     public async Task<List<HabitacionEstadoActualDto>> GetEstadoActualAsync()
     {
         var hoy = DateTime.UtcNow.Date;
+        _logger.LogInformation("[Backend-Debug] GetEstadoActualAsync — fecha={Hoy:yyyy-MM-dd}", hoy);
 
-        var habitaciones = await _db.Habitaciones
-            .Include(h => h.IdTipoNavigation)
-            .Include(h => h.IdEstadoNavigation)
-            .Include(h => h.Estancias.Where(e => e.FechaCheckoutReal == null))
-                .ThenInclude(e => e.IdClienteTitularNavigation)
-            .Include(h => h.Reservas.Where(r => r.Estado == EstadoReservaCodigo.Code.Confirmada && r.FechaEntradaPrevista.Date == hoy))
-            .AsNoTracking()
-            .ToListAsync();
-
-        // Cargar transiciones permitidas
-        var transiciones = await _db.TransicionesEstado.ToListAsync();
-
-        return habitaciones.Select(h =>
+        try
         {
-            var estanciaActiva = h.Estancias.FirstOrDefault(e => e.FechaCheckoutReal == null);
-            var reservaHoy = h.Reservas.FirstOrDefault();
+            var habitaciones = await _db.Habitaciones
+                .Include(h => h.IdTipoNavigation)
+                .Include(h => h.IdEstadoNavigation)
+                .Include(h => h.Estancias.Where(e => e.FechaCheckoutReal == null))
+                    .ThenInclude(e => e.IdClienteTitularNavigation)
+                .Include(h => h.Reservas.Where(r => r.Estado == EstadoReservaCodigo.Code.Confirmada && r.FechaEntradaPrevista >= hoy && r.FechaEntradaPrevista < hoy.AddDays(1)))
+                .AsNoTracking()
+                .ToListAsync();
 
-            var acciones = new List<string>();
+            _logger.LogInformation("[Backend-Debug] GetEstadoActualAsync — {Count} habitaciones cargadas", habitaciones.Count);
 
-            foreach (var t in transiciones.Where(t => t.IdEstadoActual == h.IdEstado))
+            // Cargar transiciones permitidas
+            var transiciones = await _db.TransicionesEstado.ToListAsync();
+
+            var result = habitaciones.Select(h =>
             {
-                if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Ocupada) acciones.Add("CheckIn");
-                else if (t.IdEstadoActual == EstadoHabitacionCodigo.Ocupada && t.IdEstadoSiguiente == EstadoHabitacionCodigo.Limpieza) acciones.Add("CheckOut");
-                else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Mantenimiento) acciones.Add("Mantenimiento");
-                else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Disponible) acciones.Add("Habilitar");
-                else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Bloqueado) acciones.Add("Reservar");
-            }
+                var estanciaActiva = h.Estancias.FirstOrDefault(e => e.FechaCheckoutReal == null);
+                var reservaHoy = h.Reservas.FirstOrDefault();
 
-            // CancelarReserva
-            if (reservaHoy != null) acciones.Add("CancelarReserva");
+                var acciones = new List<string>();
 
-            return new HabitacionEstadoActualDto(
-                IdHabitacion: h.IdHabitacion,
-                NumeroHabitacion: h.NumeroHabitacion,
-                Piso: h.Piso,
-                IdTipo: h.IdTipo,
-                NombreTipo: h.Tipo?.Nombre ?? "",
-                PrecioNoche: h.PrecioNoche,
-                IdEstado: h.IdEstado,
-                NombreEstado: h.Estado ?? "",
-                Descripcion: h.Descripcion,
-                IdEstanciaActiva: estanciaActiva?.IdEstancia,
-                ClienteHuesped: estanciaActiva?.ClienteTitular != null
-                    ? $"{estanciaActiva.ClienteTitular.Nombres} {estanciaActiva.ClienteTitular.Apellidos}"
-                    : null,
-                AccionesDisponibles: acciones,
-                FechaCheckin: estanciaActiva?.FechaCheckin,
-                FechaCheckoutPrevista: estanciaActiva?.FechaCheckoutPrevista,
-                FechaReservaEntrada: reservaHoy?.FechaEntradaPrevista
-            );
-        }).ToList();
+                foreach (var t in transiciones.Where(t => t.IdEstadoActual == h.IdEstado))
+                {
+                    if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Ocupada) acciones.Add("CheckIn");
+                    else if (t.IdEstadoActual == EstadoHabitacionCodigo.Ocupada && t.IdEstadoSiguiente == EstadoHabitacionCodigo.Limpieza) acciones.Add("CheckOut");
+                    else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Mantenimiento) acciones.Add("Mantenimiento");
+                    else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Disponible) acciones.Add("Habilitar");
+                    else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Bloqueado) acciones.Add("Reservar");
+                }
+
+                // CancelarReserva
+                if (reservaHoy != null) acciones.Add("CancelarReserva");
+
+                return new HabitacionEstadoActualDto(
+                    IdHabitacion: h.IdHabitacion,
+                    NumeroHabitacion: h.NumeroHabitacion,
+                    Piso: h.Piso,
+                    IdTipo: h.IdTipo,
+                    NombreTipo: h.Tipo?.Nombre ?? "",
+                    PrecioNoche: h.PrecioNoche,
+                    IdEstado: h.IdEstado,
+                    NombreEstado: h.Estado ?? "",
+                    Descripcion: h.Descripcion,
+                    IdEstanciaActiva: estanciaActiva?.IdEstancia,
+                    ClienteHuesped: estanciaActiva?.ClienteTitular != null
+                        ? $"{estanciaActiva.ClienteTitular.Nombres} {estanciaActiva.ClienteTitular.Apellidos}"
+                        : null,
+                    AccionesDisponibles: acciones,
+                    FechaCheckin: estanciaActiva?.FechaCheckin,
+                    FechaCheckoutPrevista: estanciaActiva?.FechaCheckoutPrevista,
+                    FechaReservaEntrada: reservaHoy?.FechaEntradaPrevista
+                );
+            }).ToList();
+
+            _logger.LogInformation("[Backend-Debug] GetEstadoActualAsync — {ResultCount} DTOs generados", result.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Backend-Debug] Error en GetEstadoActualAsync: {Mensaje}", ex.Message);
+            throw;
+        }
     }
 
     public async Task<List<HabitacionEstadoActualDto>> GetDisponiblesAsync(DateTime fechaEntrada, DateTime fechaSalida)
