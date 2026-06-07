@@ -44,18 +44,27 @@ public class ReporteService : IReporteService
     public async Task<List<TopProductoDto>> GetTopProductosAsync(int dias)
     {
         var fechaLimite = DateTime.UtcNow.AddDays(-dias);
-        return await _db.ItemsVenta
-            .Where(iv => iv.Venta!.FechaVenta >= fechaLimite)
-            .GroupBy(iv => iv.Producto!.Nombre)
-            .Select(g => new TopProductoDto
-            {
-                Nombre = g.Key,
-                CantidadTotal = g.Sum(iv => iv.Cantidad),
-                IngresoTotal = g.Sum(iv => iv.Subtotal).GetValueOrDefault()
-            })
-            .OrderByDescending(tp => tp.IngresoTotal)
-            .Take(10)
-            .AsNoTracking()
-            .ToListAsync();
+
+        try
+        {
+            return await _db.ItemsVenta
+                .Where(iv => iv.Venta!.FechaVenta >= fechaLimite)
+                .GroupBy(iv => iv.Producto!.Nombre)
+                .Select(g => new TopProductoDto
+                {
+                    Nombre = g.Key,
+                    CantidadTotal = g.Sum(iv => iv.Cantidad),
+                    IngresoTotal = g.Sum(iv => iv.Subtotal) ?? 0
+                })
+                .OrderByDescending(tp => tp.IngresoTotal)
+                .Take(10)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Backend-Debug] Error en GetTopProductosAsync({Dias}): {Mensaje}", dias, ex.Message);
+            throw;
+        }
     }
 }
