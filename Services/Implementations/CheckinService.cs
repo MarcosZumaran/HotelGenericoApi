@@ -38,7 +38,7 @@ public class CheckinService : ICheckinService
             .FirstOrDefaultAsync(h => h.IdHabitacion == dto.IdHabitacion)
             ?? throw new ArgumentException("Habitación no encontrada.");
 
-        if (habitacion.IdEstado != EstadoHabitacionCodigo.Disponible && habitacion.IdEstado != EstadoHabitacionCodigo.Bloqueado)
+        if (habitacion.IdEstado != EstadoHabitacionCodigo.Disponible && habitacion.IdEstado != EstadoHabitacionCodigo.Reservada)
             throw new InvalidOperationException($"La habitación {habitacion.NumeroHabitacion} no está disponible.");
 
         if (dto.IdReservaCorporativa.HasValue)
@@ -52,7 +52,8 @@ public class CheckinService : ICheckinService
             dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos,
             dto.Telefono, dto.IdClienteExistente, dto.GuardarCliente);
 
-        var total = CalcularMontoTotal(dto.FechaCheckoutPrevista, habitacion.PrecioNoche);
+        var total = CalcularMontoTotal(
+            dto.FechaCheckoutPrevista, habitacion.PrecioNoche, dto.EsPorHoras);
 
         var estancia = new Estancia
         {
@@ -63,7 +64,8 @@ public class CheckinService : ICheckinService
             FechaCheckoutPrevista = dto.FechaCheckoutPrevista,
             MontoTotal = total,
             IdEstadoEstancia = EstadoEstanciaCodigo.Activa,
-            IdReservaCorporativa = dto.IdReservaCorporativa
+            IdReservaCorporativa = dto.IdReservaCorporativa,
+            MetodoPago = dto.MetodoPago
         };
 
         using var transaction = await _db.Database.BeginTransactionAsync();
@@ -151,8 +153,14 @@ public class CheckinService : ICheckinService
         return await _db.Clientes.FirstAsync(c => c.Documento == "00000000");
     }
 
-    private static decimal CalcularMontoTotal(DateTime fechaSalida, decimal precioNoche)
+    internal static decimal CalcularMontoTotal(DateTime fechaSalida, decimal precioNoche, bool esPorHoras)
     {
+        if (esPorHoras)
+        {
+            var horas = Math.Max(1, (int)(fechaSalida - DateTime.UtcNow).TotalHours);
+            var bloques = (int)Math.Ceiling(horas / 3.0);
+            return bloques * 20.0m;
+        }
         var noches = Math.Max(1, (int)(fechaSalida.Date - DateTime.UtcNow.Date).TotalDays);
         return noches * precioNoche;
     }

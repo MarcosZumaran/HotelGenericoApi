@@ -73,7 +73,8 @@ public class CheckoutService : ICheckoutService
                 string tipoComprobante = (clienteTitular.TipoDocumento == "6") ? "01" : "03";
                 string serie = (tipoComprobante == "01") ? "F001" : "B001";
                 int correlativo = await ObtenerSiguienteCorrelativo(serie);
-                decimal igv = totalFinal * 0.18m;
+                var igvPorcentaje = await ObtenerIgvHotelAsync();
+                decimal igv = totalFinal * igvPorcentaje;
 
                 var comprobante = new Comprobante
                 {
@@ -87,7 +88,7 @@ public class CheckoutService : ICheckoutService
                     ClienteDocumentoTipo = clienteTitular.TipoDocumento,
                     ClienteDocumentoNum = clienteTitular.Documento,
                     ClienteNombre = $"{clienteTitular.Nombres} {clienteTitular.Apellidos}",
-                    MetodoPago = null,
+                    MetodoPago = estancia.MetodoPago,
                     IdEstadoSunat = 1,
                     HashXml = null
                 };
@@ -128,6 +129,12 @@ public class CheckoutService : ICheckoutService
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    private async Task<decimal> ObtenerIgvHotelAsync()
+    {
+        var config = await _db.Configuraciones.FirstOrDefaultAsync();
+        return config?.TasaIgvHotel > 0 ? config.TasaIgvHotel / 100m : 0.18m;
     }
 
     private async Task<int> ObtenerSiguienteCorrelativo(string serie)

@@ -145,7 +145,7 @@ public class VentaService : IVentaService
                 Correlativo = await ObtenerSiguienteCorrelativoAsync(),
                 FechaEmision = DateTime.UtcNow,
                 MontoTotal = total,
-                IgvMonto = total * 0.18m,
+                IgvMonto = total * await ObtenerIgvProductoAsync(),
                 ClienteDocumentoTipo = cliente?.TipoDocumento,
                 ClienteDocumentoNum = cliente?.Documento,
                 ClienteNombre = cliente != null
@@ -204,6 +204,12 @@ public class VentaService : IVentaService
 
         _logger.LogWarning("Venta {Id} eliminada. Stock devuelto.", id);
         return true;
+    }
+
+    private async Task<decimal> ObtenerIgvProductoAsync()
+    {
+        var config = await _db.Configuraciones.FirstOrDefaultAsync();
+        return config?.TasaIgvProductos > 0 ? config.TasaIgvProductos / 100m : 0.18m;
     }
 
     private async Task<int> ObtenerSiguienteCorrelativoAsync()

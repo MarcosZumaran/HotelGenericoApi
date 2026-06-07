@@ -7,4 +7,5 @@ public static class EstadoHabitacionCodigo
     public const int Limpieza = 3;
     public const int Mantenimiento = 4;
     public const int Bloqueado = 5;
+    public const int Reservada = 5;
 }

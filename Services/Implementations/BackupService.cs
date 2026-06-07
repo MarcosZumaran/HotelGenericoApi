@@ -10,6 +10,8 @@ public class BackupService : IBackupService
     private readonly string _connectionString;
     private readonly string _databaseName;
     private readonly string _backupDirectory;
+    private readonly string _externalPath;
+    private readonly bool _copyToExternal;
 
     public BackupService(IConfiguration configuration)
     {
@@ -20,16 +22,40 @@ public class BackupService : IBackupService
         // Carpeta multiplataforma con permisos garantizados
         if (OperatingSystem.IsWindows())
         {
-            // Windows: carpeta dentro del proyecto (sin problemas de permisos)
             _backupDirectory = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "backups");
         }
         else
         {
-            // Linux: carpeta compartida con permisos 777
             _backupDirectory = "/var/opt/mssql/backups";
         }
 
         Directory.CreateDirectory(_backupDirectory);
+
+        // Configuración de ruta externa (USB/red/Drive)
+        _externalPath = configuration.GetValue<string>("Backup:ExternalPath") ?? "";
+        _copyToExternal = configuration.GetValue<bool>("Backup:CopyToExternalAfterCreate");
+    }
+
+    public async Task<string> CreateBackupAndCopyAsync(string type = "Full")
+    {
+        var backupPath = await CreateBackupAsync(type);
+
+        if (_copyToExternal && !string.IsNullOrEmpty(_externalPath))
+        {
+            try
+            {
+                Directory.CreateDirectory(_externalPath);
+                var destFileName = Path.GetFileName(backupPath);
+                var destPath = Path.Combine(_externalPath, destFileName);
+                File.Copy(backupPath, destPath, overwrite: true);
+            }
+            catch
+            {
+                // Si falla la copia externa, el backup local sigue siendo válido
+            }
+        }
+
+        return backupPath;
     }
 
     public async Task<string> CreateBackupAsync(string type = "Full")

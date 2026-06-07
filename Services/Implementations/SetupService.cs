@@ -46,7 +46,7 @@ public class SetupService
     public async Task CrearUsuariosPorDefectoAsync()
     {
         // Asegurar que los roles existen
-        var roles = new[] { "Administrador", "Recepcionista", "Limpieza" };
+        var roles = new[] { "Administrador", "Recepcion", "Limpieza" };
         foreach (var nombreRol in roles)
         {
             if (!await _db.RolesUsuario.AnyAsync(r => r.Nombre == nombreRol))
@@ -58,7 +58,7 @@ public class SetupService
 
         // Obtener IDs de roles
         var rolAdmin = await _db.RolesUsuario.FirstAsync(r => r.Nombre == "Administrador");
-        var rolRecepcion = await _db.RolesUsuario.FirstAsync(r => r.Nombre == "Recepcionista");
+        var rolRecepcion = await _db.RolesUsuario.FirstAsync(r => r.Nombre == "Recepcion");
         var rolLimpieza = await _db.RolesUsuario.FirstAsync(r => r.Nombre == "Limpieza");
 
         // Definir usuarios por defecto con contraseñas conocidas en desarrollo
@@ -88,7 +88,7 @@ public class SetupService
 
                     _logger.LogInformation("Usuario creado: {Username} (Rol: {Rol})", username,
                     usuariosPorDefecto.First(u => u.Username == username).IdRol == rolAdmin.IdRol ? "Administrador"
-                    : username == "recepcion" ? "Recepcionista"
+                    : username == "recepcion" ? "Recepcion"
                     : "Limpieza");
                 }
             }

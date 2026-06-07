@@ -188,7 +188,7 @@ public class UsuarioService : IUsuarioService
     {
         return nombreRol switch
         {
-            "Administrador" => 480,
+            "Administrador" => 10,
             "Recepcion" => 720,
             "Limpieza" => 1440,
             _ => 30

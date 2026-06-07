@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using HotelGenericoApi.Constants;
 using HotelGenericoApi.DTOs.Request;
 using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
@@ -51,6 +52,15 @@ public class EstanciaController : ControllerBase
     {
         var estancias = await _queryService.GetAllAsync();
         return Ok(estancias);
+    }
+
+    [HttpGet("activas")]
+    [ProducesResponseType(typeof(List<Estancia>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<Estancia>>> GetActivas()
+    {
+        var estancias = await _queryService.GetAllAsync();
+        var activas = estancias.Where(e => e.IdEstadoEstancia == EstadoEstanciaCodigo.Activa).ToList();
+        return Ok(activas);
     }
 
     [HttpGet("{id}")]

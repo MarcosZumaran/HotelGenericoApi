@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HotelGenericoApi.Models;
@@ -35,6 +36,8 @@ public partial class Estancia
     public DateTime? HoraRegresoTemporal { get; set; }
 
     public bool? LlavesDejadas { get; set; }
+
+    public string? MetodoPago { get; set; }
 
     public virtual ICollection<Comprobante> Comprobantes { get; set; } = new List<Comprobante>();
 

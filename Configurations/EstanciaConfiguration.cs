@@ -32,6 +32,11 @@ public class EstanciaConfiguration : IEntityTypeConfiguration<Estancia>
         builder.Property(e => e.IdReserva).HasColumnName("id_reserva");
         builder.Property(e => e.IdReservaCorporativa).HasColumnName("id_reserva_corporativa");
         builder.Property(e => e.LlavesDejadas).HasColumnName("llaves_dejadas");
+        builder.Property(e => e.MetodoPago)
+            .HasMaxLength(3)
+            .IsUnicode(false)
+            .IsFixedLength()
+            .HasColumnName("metodo_pago");
         builder.Property(e => e.MontoTotal)
             .HasColumnType("decimal(10, 2)")
             .HasColumnName("monto_total");
