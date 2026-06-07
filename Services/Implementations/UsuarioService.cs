@@ -137,23 +137,41 @@ public class UsuarioService : IUsuarioService
 
     public async Task<(string token, UsuarioResponseDto usuario)?> LoginAsync(LoginDto dto, string? ipAddress = null, string? userAgent = null)
     {
+        _logger.LogInformation("[Backend-Debug] Login attempt: Username={Username}, Ip={Ip}", dto.Username, ipAddress);
+
         var usuario = await _db.Usuarios
             .Include(u => u.IdRolNavigation)
             .FirstOrDefaultAsync(u => u.Username == dto.Username && u.EstaActivo == true);
 
         bool succeeded;
 
-        if (usuario is null || !BCrypt.Net.BCrypt.Verify(dto.Password, usuario.PasswordHash))
+        if (usuario is null)
         {
+            _logger.LogWarning("[Backend-Debug] Login failed: user '{Username}' not found or inactive", dto.Username);
             succeeded = false;
             await RegistrarLoginAttemptAsync(ipAddress, dto.Username, succeeded, userAgent);
             return null;
         }
 
+        _logger.LogInformation("[Backend-Debug] User found: Id={Id}, Rol={Rol}, Active={Active}",
+            usuario.IdUsuario, usuario.Rol?.Nombre, usuario.EstaActivo);
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.Password, usuario.PasswordHash))
+        {
+            _logger.LogWarning("[Backend-Debug] Login failed: invalid password for user '{Username}'", dto.Username);
+            succeeded = false;
+            await RegistrarLoginAttemptAsync(ipAddress, dto.Username, succeeded, userAgent);
+            return null;
+        }
+
+        _logger.LogInformation("[Backend-Debug] Login success: user '{Username}', generating token", dto.Username);
         succeeded = true;
         await RegistrarLoginAttemptAsync(ipAddress, dto.Username, succeeded, userAgent);
 
         var token = GenerarToken(usuario);
+        _logger.LogInformation("[Backend-Debug] Token generated for '{Username}', expires in {Min} min",
+            dto.Username, ObtenerExpiracionMinutos(usuario.Rol?.Nombre));
+
         var usuarioDto = new UsuarioResponseDto(
             usuario.IdUsuario,
             usuario.Username,
@@ -164,6 +182,17 @@ public class UsuarioService : IUsuarioService
         );
 
         return (token, usuarioDto);
+    }
+
+    private static int ObtenerExpiracionMinutos(string? nombreRol)
+    {
+        return nombreRol switch
+        {
+            "Administrador" => 480,
+            "Recepcion" => 720,
+            "Limpieza" => 1440,
+            _ => 30
+        };
     }
 
     private async Task RegistrarLoginAttemptAsync(string? ipAddress, string? username, bool succeeded, string? userAgent)
@@ -193,14 +222,7 @@ public class UsuarioService : IUsuarioService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        // Determinar expiración según rol, expresiones en minutos
-        int expirationMinutes = usuario.Rol?.Nombre switch
-        {
-            "Administrador" => 10,
-            "Recepcion" => 720,
-            "Limpieza" => 1440,
-            _ => 30 // Por defecto
-        };
+        int expirationMinutes = ObtenerExpiracionMinutos(usuario.Rol?.Nombre);
 
         var claims = new[]
         {
