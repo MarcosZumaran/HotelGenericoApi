@@ -11,8 +11,13 @@ namespace HotelGenericoApi.Controllers;
 public class ProductoController : ControllerBase
 {
     private readonly IProductoService _service;
+    private readonly IExcelExportService _excelExportService;
 
-    public ProductoController(IProductoService service) => _service = service;
+    public ProductoController(IProductoService service, IExcelExportService excelExportService)
+    {
+        _service = service;
+        _excelExportService = excelExportService;
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -61,5 +66,13 @@ public class ProductoController : ControllerBase
         {
             return BadRequest(new { mensaje = ex.Message });
         }
+    }
+
+    [HttpGet("excel")]
+    public async Task<IActionResult> ExportarExcel()
+    {
+        var productos = await _service.GetAllAsync();
+        var bytes = _excelExportService.GenerateProductosExcel(productos);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "productos.xlsx");
     }
 }

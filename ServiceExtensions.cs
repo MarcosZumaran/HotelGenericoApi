@@ -75,6 +75,9 @@ public static class ServiceExtensions
         // Backup
         services.AddScoped<IBackupService, BackupService>();
 
+        // Excel
+        services.AddScoped<IExcelExportService, ExcelExportService>();
+
         // limpiado de backups
         services.AddHostedService<BackupCleanupService>();
 
