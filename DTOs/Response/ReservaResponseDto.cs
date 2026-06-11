@@ -11,5 +11,6 @@ public sealed record ReservaResponseDto(
     string Estado,
     string? DocumentoCliente,
     string? Observaciones,
-    bool EsNoShow
+    bool EsNoShow,
+    int? IdReservaCorporativa = null
 );

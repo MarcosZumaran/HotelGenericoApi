@@ -36,6 +36,8 @@ public partial class Usuario
 
     public virtual ICollection<Ventum> Venta { get; set; } = new List<Ventum>();
 
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
     // Convenience navigation properties (excluded from EF mapping)
     [NotMapped]
     public RolUsuario? Rol => IdRolNavigation;

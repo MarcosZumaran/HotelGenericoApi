@@ -248,4 +248,64 @@ public class PdfService : IPdfService
 
         return document.GeneratePdf();
     }
+
+    public async Task<byte[]> GenerarPdfEstanciasActivasAsync()
+    {
+        var estancias = await _db.Estancias
+            .AsNoTracking()
+            .Where(e => e.IdEstadoEstancia == 2)
+            .Include(e => e.IdHabitacionNavigation)
+            .Include(e => e.IdClienteTitularNavigation)
+            .OrderBy(e => e.IdHabitacion)
+            .ToListAsync();
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(30);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Content().Column(col =>
+                {
+                    col.Item().AlignCenter().Text("HUÉSPEDES ACTIVOS").FontSize(16).Bold();
+                    col.Item().AlignCenter().Text($"Generado: {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(12);
+                    col.Item().PaddingVertical(10);
+
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(2);
+                            columns.RelativeColumn(1);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Text("Hab.").Bold();
+                            header.Cell().Text("Cliente").Bold();
+                            header.Cell().Text("Check-in").Bold();
+                            header.Cell().Text("Check-out prev.").Bold();
+                            header.Cell().Text("Total").Bold().AlignRight();
+                        });
+
+                        foreach (var e in estancias)
+                        {
+                            table.Cell().Text(e.IdHabitacionNavigation?.NumeroHabitacion ?? "—");
+                            table.Cell().Text($"{e.IdClienteTitularNavigation?.Nombres} {e.IdClienteTitularNavigation?.Apellidos}");
+                            table.Cell().Text(e.FechaCheckin.ToString("dd/MM/yyyy HH:mm"));
+                            table.Cell().Text(e.FechaCheckoutPrevista.ToString("dd/MM/yyyy HH:mm"));
+                            table.Cell().AlignRight().Text($"S/ {e.MontoTotal:F2}");
+                        }
+                    });
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
 }

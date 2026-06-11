@@ -18,4 +18,5 @@ public sealed record CheckinCreateDto
     public DateTime? FechaSalidaPrevista { get; init; }
     public int? IdReservaCorporativa { get; set; }
     public bool EsPorHoras { get; init; } = false;
+    public List<HuespedDto>? Huespedes { get; init; }
 }

@@ -25,6 +25,8 @@ public class EstanciaController : ControllerBase
     private readonly IConsumoEstanciaService _consumoService;
     private readonly ITrasladoHabitacionService _trasladoService;
     private readonly IReservaCommandService _reservaCommandService;
+    private readonly IExcelExportService _excelExportService;
+    private readonly IPdfService _pdfService;
 
     public EstanciaController(
         IEstanciaQueryService queryService,
@@ -34,7 +36,9 @@ public class EstanciaController : ControllerBase
         IHuespedService huespedService,
         IConsumoEstanciaService consumoService,
         ITrasladoHabitacionService trasladoService,
-        IReservaCommandService reservaCommandService)
+        IReservaCommandService reservaCommandService,
+        IExcelExportService excelExportService,
+        IPdfService pdfService)
     {
         _queryService = queryService;
         _checkinService = checkinService;
@@ -44,6 +48,8 @@ public class EstanciaController : ControllerBase
         _consumoService = consumoService;
         _trasladoService = trasladoService;
         _reservaCommandService = reservaCommandService;
+        _excelExportService = excelExportService;
+        _pdfService = pdfService;
     }
 
     [HttpGet]
@@ -62,6 +68,23 @@ public class EstanciaController : ControllerBase
     {
         var activas = await _queryService.GetActivasAsync();
         return Ok(activas);
+    }
+
+    [HttpGet("activas/excel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportActivasExcel()
+    {
+        var activas = await _queryService.GetActivasAsync();
+        var bytes = _excelExportService.GenerateEstanciasActivasExcel(activas);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "huespedes_activos.xlsx");
+    }
+
+    [HttpGet("activas/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportActivasPdf()
+    {
+        var bytes = await _pdfService.GenerarPdfEstanciasActivasAsync();
+        return File(bytes, "application/pdf", "huespedes_activos.pdf");
     }
 
     [HttpGet("{id}")]
@@ -162,6 +185,50 @@ public class EstanciaController : ControllerBase
     public async Task<ActionResult> AddConsumo(int idEstancia, [FromBody] ItemEstancia item)
     {
         var result = await _consumoService.AddConsumoAsync(idEstancia, item);
+        if (!result)
+            return BadRequest();
+        return Ok();
+    }
+
+    [HttpPost("{idEstancia}/consumos/batch")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> AddConsumoBatch(int idEstancia, [FromBody] DTOs.Request.ConsumoBatchDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var items = dto.Items.Select(i => new ItemEstancia
+        {
+            IdProducto = i.IdProducto,
+            Cantidad = i.Cantidad,
+            PrecioUnitario = i.PrecioUnitario
+        }).ToList();
+
+        var result = await _consumoService.AddConsumoBatchAsync(idEstancia, items, userId);
+        if (!result)
+            return BadRequest();
+        return Ok();
+    }
+
+    [HttpPost("{idEstancia}/consumos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> AddConsumos(int idEstancia, [FromBody] ConsumoListDto dto)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var items = dto.Consumos.Select(i => new ItemEstancia
+        {
+            IdProducto = i.IdProducto,
+            Cantidad = i.Cantidad,
+            PrecioUnitario = i.PrecioUnitario
+        }).ToList();
+
+        var result = await _consumoService.AddConsumoBatchAsync(idEstancia, items, userId);
         if (!result)
             return BadRequest();
         return Ok();

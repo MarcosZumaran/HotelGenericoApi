@@ -27,7 +27,9 @@ public class ReservaCommandService : IReservaCommandService
             dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos,
             null, dto.IdClienteExistente, dto.GuardarCliente);
 
-        var total = CalcularMontoTotal(dto.FechaSalidaPrevista, habitacion.PrecioNoche);
+        var total = dto.EsPorHoras
+            ? CalcularMontoPorHoras(dto.FechaEntradaPrevista, dto.FechaSalidaPrevista, habitacion.PrecioNoche)
+            : CalcularMontoTotal(dto.FechaSalidaPrevista, habitacion.PrecioNoche);
 
         var reserva = new Reserva
         {
@@ -96,5 +98,11 @@ public class ReservaCommandService : IReservaCommandService
     {
         var noches = Math.Max(1, (int)(fechaSalida.Date - DateTime.UtcNow.Date).TotalDays);
         return noches * precioNoche;
+    }
+
+    private static decimal CalcularMontoPorHoras(DateTime fechaEntrada, DateTime fechaSalida, decimal precioNoche)
+    {
+        var horas = Math.Max(1, (int)Math.Ceiling((fechaSalida - fechaEntrada).TotalHours));
+        return Math.Round(horas * precioNoche / 24m * 0.75m, 2);
     }
 }

@@ -1158,5 +1158,55 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.estancia')
+      AND name = N'metodo_pago'
+)
+BEGIN
+    ALTER TABLE dbo.estancia
+        ADD metodo_pago CHAR(3) NULL;
+END
+GO
+
+IF OBJECT_ID(N'dbo.pago', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.pago (
+        id_pago      INT IDENTITY(1,1) NOT NULL,
+        id_estancia  INT NOT NULL,
+        monto        DECIMAL(10,2) NOT NULL,
+        metodo_pago  CHAR(3) NOT NULL,
+        fecha_pago   DATETIME2 NOT NULL CONSTRAINT DF_pago_fecha_pago DEFAULT (SYSDATETIME()),
+
+        CONSTRAINT PK_pago PRIMARY KEY CLUSTERED (id_pago),
+        CONSTRAINT FK_pago_estancia
+            FOREIGN KEY (id_estancia) REFERENCES dbo.estancia (id_estancia)
+            ON DELETE CASCADE
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.refresh_token', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.refresh_token (
+        id_refresh_token INT IDENTITY(1,1) NOT NULL,
+        id_usuario       INT NOT NULL,
+        token            VARCHAR(512) NOT NULL,
+        expires_at       DATETIME2 NOT NULL,
+        created_at       DATETIME2 NOT NULL CONSTRAINT DF_refresh_token_created_at DEFAULT (SYSDATETIME()),
+        revoked_at       DATETIME2 NULL,
+
+        CONSTRAINT PK_refresh_token PRIMARY KEY CLUSTERED (id_refresh_token),
+        CONSTRAINT UQ_refresh_token_token UNIQUE (token),
+        CONSTRAINT FK_refresh_token_usuario
+            FOREIGN KEY (id_usuario) REFERENCES dbo.usuario (id_usuario)
+            ON DELETE CASCADE
+    );
+
+    CREATE NONCLUSTERED INDEX IX_refresh_token_token
+        ON dbo.refresh_token (token);
+END
+GO
+
 PRINT N'Base de datos HotelDB creada con éxito.';
 GO

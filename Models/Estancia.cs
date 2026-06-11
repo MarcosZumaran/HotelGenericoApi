@@ -59,6 +59,8 @@ public partial class Estancia
 
     public virtual ICollection<ItemEstancia> ItemsEstancia { get; set; } = new List<ItemEstancia>();
 
+    public virtual ICollection<Pago> Pagos { get; set; } = new List<Pago>();
+
     public virtual ICollection<MovimientoStock> MovimientoStocks { get; set; } = new List<MovimientoStock>();
 
     public virtual ICollection<ObjetoPerdido> ObjetoPerdidos { get; set; } = new List<ObjetoPerdido>();

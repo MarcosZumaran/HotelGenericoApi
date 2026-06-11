@@ -76,10 +76,14 @@ public class ProductoService : IProductoService
         var entity = await _db.Productos.FindAsync(id);
         if (entity is null) return false;
 
-        _mapper.UpdateFromDto(dto, entity);
-
         if (file is not null)
+        {
+            var oldImagenUrl = entity.ImagenUrl;
             entity.ImagenUrl = await ProcesarImagenAsync(file);
+            EliminarArchivoImagen(oldImagenUrl);
+        }
+
+        _mapper.UpdateFromDto(dto, entity);
 
         await _db.SaveChangesAsync();
         return true;
@@ -89,6 +93,7 @@ public class ProductoService : IProductoService
     {
         var entity = await _db.Productos.FindAsync(id);
         if (entity is null) return false;
+        EliminarArchivoImagen(entity.ImagenUrl);
         _db.Productos.Remove(entity);
         await _db.SaveChangesAsync();
         return true;
@@ -148,6 +153,14 @@ public class ProductoService : IProductoService
         return $"/{rutaRelativa.Replace(Path.DirectorySeparatorChar, '/')}";
     }
 
+
+    private static void EliminarArchivoImagen(string? imagenUrl)
+    {
+        if (string.IsNullOrEmpty(imagenUrl)) return;
+        var rutaCompleta = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", imagenUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+        if (File.Exists(rutaCompleta))
+            File.Delete(rutaCompleta);
+    }
 
     public async Task<bool> AddStockAsync(int id, int cantidad)
     {

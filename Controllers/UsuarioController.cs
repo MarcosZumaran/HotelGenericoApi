@@ -82,21 +82,10 @@ public class UsuarioController : ControllerBase
         var result = await _service.LoginAsync(dto, ipAddress, userAgent);
         if (result is null) return Unauthorized();
 
-        var (token, usuario) = result.Value;
+        var (token, refreshToken, usuario) = result.Value;
 
-        var cookieSection = _configuration.GetSection("CookieAuth");
-        var secure = cookieSection.GetValue<bool>("Secure");
-        var sameSite = cookieSection.GetValue<string>("SameSite") switch
-        {
-            "Strict" => SameSiteMode.Strict,
-            "Lax" => SameSiteMode.Lax,
-            "None" => SameSiteMode.None,
-            _ => SameSiteMode.Lax
-        };
-
-        var tokenHandler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-        var jwtToken = tokenHandler.ReadJwtToken(token);
-        var expiration = jwtToken.ValidTo;
+        var (secure, sameSite) = GetCookieOptions();
+        var expiration = ObtenerExpiracionToken(token);
 
         Response.Cookies.Append("auth_token", token, new CookieOptions
         {
@@ -104,6 +93,59 @@ public class UsuarioController : ControllerBase
             Secure = secure,
             SameSite = sameSite,
             Expires = expiration,
+            Path = "/"
+        });
+
+        Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = secure,
+            SameSite = sameSite,
+            Expires = DateTime.UtcNow.AddDays(7),
+            Path = "/"
+        });
+
+        return Ok(usuario);
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(DTOs.Response.UsuarioResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh()
+    {
+        var refreshToken = Request.Cookies["refresh_token"];
+        if (string.IsNullOrEmpty(refreshToken))
+            return Unauthorized(new { message = "No hay refresh token" });
+
+        var result = await _service.RefreshTokenAsync(refreshToken);
+        if (result is null)
+        {
+            Response.Cookies.Delete("auth_token", GetDeleteOptions());
+            Response.Cookies.Delete("refresh_token", GetDeleteOptions());
+            return Unauthorized(new { message = "Refresh token inválido o expirado" });
+        }
+
+        var (token, nuevoRefresh, usuario) = result.Value;
+
+        var (secure, sameSite) = GetCookieOptions();
+        var expiration = ObtenerExpiracionToken(token);
+
+        Response.Cookies.Append("auth_token", token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = secure,
+            SameSite = sameSite,
+            Expires = expiration,
+            Path = "/"
+        });
+
+        Response.Cookies.Append("refresh_token", nuevoRefresh, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = secure,
+            SameSite = sameSite,
+            Expires = DateTime.UtcNow.AddDays(7),
             Path = "/"
         });
 
@@ -126,7 +168,33 @@ public class UsuarioController : ControllerBase
     [HttpPost("logout")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userIdClaim is not null && int.TryParse(userIdClaim, out var userId))
+        {
+            await _service.RevokeRefreshTokensAsync(userId);
+        }
+        else
+        {
+            var refreshToken = Request.Cookies["refresh_token"];
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                var stored = await _service.RefreshTokenAsync(refreshToken);
+                if (stored.HasValue)
+                {
+                    await _service.RevokeRefreshTokensAsync(stored.Value.usuario.IdUsuario);
+                }
+            }
+        }
+
+        Response.Cookies.Delete("auth_token", GetDeleteOptions());
+        Response.Cookies.Delete("refresh_token", GetDeleteOptions());
+
+        return Ok(new { message = "Sesión cerrada" });
+    }
+
+    private (bool secure, SameSiteMode sameSite) GetCookieOptions()
     {
         var cookieSection = _configuration.GetSection("CookieAuth");
         var secure = cookieSection.GetValue<bool>("Secure");
@@ -137,15 +205,22 @@ public class UsuarioController : ControllerBase
             "None" => SameSiteMode.None,
             _ => SameSiteMode.Lax
         };
+        return (secure, sameSite);
+    }
 
-        Response.Cookies.Delete("auth_token", new CookieOptions
+    private static DateTime ObtenerExpiracionToken(string token)
+    {
+        var tokenHandler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+        var jwtToken = tokenHandler.ReadJwtToken(token);
+        return jwtToken.ValidTo;
+    }
+
+    private static CookieOptions GetDeleteOptions()
+    {
+        return new CookieOptions
         {
             HttpOnly = true,
-            Secure = secure,
-            SameSite = sameSite,
             Path = "/"
-        });
-
-        return Ok(new { message = "Sesión cerrada" });
+        };
     }
 }

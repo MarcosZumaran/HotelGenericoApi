@@ -11,5 +11,7 @@ public interface IUsuarioService
     Task<UsuarioResponseDto> CreateAsync(UsuarioCreateDto dto);
     Task<bool> UpdateAsync(int id, UsuarioUpdateDto dto);
     Task<bool> DeleteAsync(int id);
-    Task<(string token, UsuarioResponseDto usuario)?> LoginAsync(LoginDto dto, string? ipAddress, string? userAgent);
+    Task<(string token, string refreshToken, UsuarioResponseDto usuario)?> LoginAsync(LoginDto dto, string? ipAddress, string? userAgent);
+    Task<(string token, string refreshToken, UsuarioResponseDto usuario)?> RefreshTokenAsync(string refreshToken);
+    Task RevokeRefreshTokensAsync(int idUsuario);
 }

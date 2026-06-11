@@ -56,6 +56,10 @@ public partial class HotelDbContext : DbContext
 
     public virtual DbSet<MetodoPago> MetodosPago { get; set; }
 
+    public virtual DbSet<Pago> Pagos { get; set; }
+
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public virtual DbSet<MovimientoStock> MovimientosStock { get; set; }
 
     public virtual DbSet<ObjetoPerdido> ObjetosPerdidos { get; set; }

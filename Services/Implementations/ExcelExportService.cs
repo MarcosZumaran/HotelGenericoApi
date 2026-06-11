@@ -62,6 +62,39 @@ public class ExcelExportService : IExcelExportService
         return stream.ToArray();
     }
 
+    public byte[] GenerateEstanciasActivasExcel(IEnumerable<Estancia> data)
+    {
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Huespedes Activos");
+        ws.Cell(1, 1).Value = "N° Habitación";
+        ws.Cell(1, 2).Value = "Huésped";
+        ws.Cell(1, 3).Value = "Check-In";
+        ws.Cell(1, 4).Value = "Salida Prevista";
+        ws.Cell(1, 5).Value = "Monto";
+        ws.Cell(1, 6).Value = "Método de Pago";
+        var headerRange = ws.Range(1, 1, 1, 6);
+        headerRange.Style.Font.Bold = true;
+        headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+        int row = 2;
+        foreach (var item in data)
+        {
+            ws.Cell(row, 1).Value = item.IdHabitacionNavigation?.NumeroHabitacion ?? item.IdHabitacion.ToString();
+            ws.Cell(row, 2).Value = item.IdClienteTitularNavigation != null
+                ? $"{item.IdClienteTitularNavigation.Nombres} {item.IdClienteTitularNavigation.Apellidos}"
+                : "";
+            ws.Cell(row, 3).Value = item.FechaCheckin.ToString("dd/MM/yyyy HH:mm");
+            ws.Cell(row, 4).Value = item.FechaCheckoutPrevista.ToString("dd/MM/yyyy HH:mm");
+            ws.Cell(row, 5).Value = item.MontoTotal;
+            ws.Cell(row, 5).Style.NumberFormat.Format = "#,##0.00";
+            ws.Cell(row, 6).Value = item.MetodoPago ?? "";
+            row++;
+        }
+        ws.Columns().AdjustToContents();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
     public byte[] GenerateProductosExcel(IEnumerable<ProductoResponseDto> data)
     {
         using var workbook = new XLWorkbook();

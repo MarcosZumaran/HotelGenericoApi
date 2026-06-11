@@ -59,9 +59,10 @@ public static class ServiceExtensions
         services.AddScoped<ICategoriaProductoService, CategoriaProductoService>();
         services.AddScoped<IAmenidadService, AmenidadService>();
         services.AddScoped<IReservaCorporativaService, ReservaCorporativaService>();
-        services.AddScoped<IIncidenteService, IncidenteService>();
+		services.AddScoped<IIncidenteService, IncidenteService>();
+        services.AddScoped<IStockHabitacionService, StockHabitacionService>();
 
-        // HttpClient tipificado para RENIEC
+		// HttpClient tipificado para RENIEC
         services.AddHttpClient<IReniecService, ReniecService>();
 
         // Caché

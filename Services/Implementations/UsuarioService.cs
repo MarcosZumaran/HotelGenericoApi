@@ -1,6 +1,7 @@
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -152,7 +153,7 @@ public class UsuarioService : IUsuarioService
         return true;
     }
 
-    public async Task<(string token, UsuarioResponseDto usuario)?> LoginAsync(LoginDto dto, string? ipAddress = null, string? userAgent = null)
+    public async Task<(string token, string refreshToken, UsuarioResponseDto usuario)?> LoginAsync(LoginDto dto, string? ipAddress = null, string? userAgent = null)
     {
         _logger.LogInformation("[Backend-Debug] Login attempt: Username={Username}, Ip={Ip}", dto.Username, ipAddress);
 
@@ -186,6 +187,7 @@ public class UsuarioService : IUsuarioService
         await RegistrarLoginAttemptAsync(ipAddress, dto.Username, succeeded, userAgent);
 
         var token = GenerarToken(usuario);
+        var refreshToken = await GenerarYGuardarRefreshTokenAsync(usuario.IdUsuario);
         _logger.LogInformation("[Backend-Debug] Token generated for '{Username}', expires in {Min} min",
             dto.Username, ObtenerExpiracionMinutos(usuario.Rol?.Nombre));
 
@@ -198,7 +200,49 @@ public class UsuarioService : IUsuarioService
             usuario.FechaCreacion
         );
 
-        return (token, usuarioDto);
+        return (token, refreshToken, usuarioDto);
+    }
+
+    public async Task<(string token, string refreshToken, UsuarioResponseDto usuario)?> RefreshTokenAsync(string refreshToken)
+    {
+        var stored = await _db.RefreshTokens
+            .Include(rt => rt.IdUsuarioNavigation)
+            .ThenInclude(u => u.IdRolNavigation)
+            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+
+        if (stored is null || !stored.IsActive || !stored.IdUsuarioNavigation.EstaActivo)
+            return null;
+
+        stored.RevokedAt = DateTime.UtcNow;
+
+        var usuario = stored.IdUsuarioNavigation;
+        var nuevoToken = GenerarToken(usuario);
+        var nuevoRefresh = await GenerarYGuardarRefreshTokenAsync(usuario.IdUsuario);
+
+        await _db.SaveChangesAsync();
+
+        var usuarioDto = new UsuarioResponseDto(
+            usuario.IdUsuario,
+            usuario.Username,
+            usuario.IdRol,
+            usuario.Rol?.Nombre ?? "",
+            usuario.EstaActivo,
+            usuario.FechaCreacion
+        );
+
+        return (nuevoToken, nuevoRefresh, usuarioDto);
+    }
+
+    public async Task RevokeRefreshTokensAsync(int idUsuario)
+    {
+        var tokens = await _db.RefreshTokens
+            .Where(rt => rt.IdUsuario == idUsuario && rt.RevokedAt == null)
+            .ToListAsync();
+
+        foreach (var t in tokens)
+            t.RevokedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
     }
 
     private static int ObtenerExpiracionMinutos(string? nombreRol)
@@ -257,5 +301,24 @@ public class UsuarioService : IUsuarioService
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private async Task<string> GenerarYGuardarRefreshTokenAsync(int idUsuario)
+    {
+        var tokenBytes = RandomNumberGenerator.GetBytes(64);
+        var token = Convert.ToBase64String(tokenBytes);
+
+        var refresh = new RefreshToken
+        {
+            IdUsuario = idUsuario,
+            Token = token,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.RefreshTokens.Add(refresh);
+        await _db.SaveChangesAsync();
+
+        return token;
     }
 }

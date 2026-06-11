@@ -214,9 +214,10 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 // Servir archivos estáticos desde wwwroot
 app.UseStaticFiles();
 
-// Crear carpeta de imágenes si no existe
-var imagenesPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "imagenes", "productos");
-Directory.CreateDirectory(imagenesPath);
+// Crear carpetas de imágenes si no existen
+Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "imagenes", "productos"));
+Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "imagenes", "incidentes"));
+Directory.CreateDirectory(Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "imagenes", "objetos"));
 
 app.UseResponseCompression();
 app.UseCors();

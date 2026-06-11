@@ -50,7 +50,7 @@ public class CheckinService : ICheckinService
 
         var cliente = await ResolverClienteAsync(
             dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos,
-            dto.Telefono, dto.IdClienteExistente, dto.GuardarCliente);
+            dto.Telefono, dto.IdClienteExistente, dto.GuardarCliente, dto.UsarClienteAnonimo);
 
         var total = CalcularMontoTotal(
             dto.FechaCheckoutPrevista, habitacion.PrecioNoche, dto.EsPorHoras);
@@ -74,6 +74,15 @@ public class CheckinService : ICheckinService
             _db.Estancias.Add(estancia);
             await _db.SaveChangesAsync();
 
+            var pago = new Pago
+            {
+                IdEstancia = estancia.IdEstancia,
+                Monto = estancia.MontoTotal,
+                MetodoPago = estancia.MetodoPago ?? MetodoPagoCodigo.Efectivo,
+                FechaPago = DateTime.UtcNow
+            };
+            _db.Pagos.Add(pago);
+
             habitacion.IdEstado = EstadoHabitacionCodigo.Ocupada;
             habitacion.FechaUltimoCambio = DateTime.UtcNow;
 
@@ -93,6 +102,21 @@ public class CheckinService : ICheckinService
                 if (corporativa != null && corporativa.Estado == EstadoReservaCodigo.Code.Pendiente)
                 {
                     corporativa.Estado = EstadoReservaCodigo.Code.Confirmada;
+                }
+            }
+
+            if (dto.Huespedes?.Count > 0)
+            {
+                foreach (var h in dto.Huespedes)
+                {
+                    var c = await CrearObtenerClienteAsync(h.TipoDocumento, h.Documento, h.Nombres, h.Apellidos, h.Telefono, h.EsAnonimo);
+                    _db.Huespedes.Add(new Huesped
+                    {
+                        IdEstancia = estancia.IdEstancia,
+                        IdCliente = c.IdCliente,
+                        EsTitular = h.EsTitular,
+                        FechaRegistro = DateTime.UtcNow,
+                    });
                 }
             }
 
@@ -121,8 +145,11 @@ public class CheckinService : ICheckinService
 
     private async Task<Cliente> ResolverClienteAsync(
         string tipoDocumento, string documento, string nombres, string apellidos,
-        string? telefono, int? idClienteExistente, bool guardarCliente)
+        string? telefono, int? idClienteExistente, bool guardarCliente, bool usarClienteAnonimo)
     {
+        if (usarClienteAnonimo)
+            return await ObtenerClienteAnonimoAsync();
+
         tipoDocumento = TipoDocumentoMapper.Normalize(tipoDocumento);
         if (idClienteExistente.HasValue)
         {
@@ -150,7 +177,56 @@ public class CheckinService : ICheckinService
             return nuevo;
         }
 
-        return await _db.Clientes.FirstAsync(c => c.Documento == "00000000");
+        return await ObtenerClienteAnonimoAsync();
+    }
+
+    private async Task<Cliente> CrearObtenerClienteAsync(
+        string tipoDocumento, string documento, string nombres, string apellidos,
+        string? telefono, bool esAnonimo)
+    {
+        if (esAnonimo)
+            return await ObtenerClienteAnonimoAsync();
+
+        tipoDocumento = TipoDocumentoMapper.Normalize(tipoDocumento);
+
+        if (!string.IsNullOrWhiteSpace(documento))
+        {
+            var existente = await _db.Clientes
+                .FirstOrDefaultAsync(c => c.TipoDocumento == tipoDocumento && c.Documento == documento);
+            if (existente != null) return existente;
+        }
+
+        var nuevo = new Cliente
+        {
+            TipoDocumento = tipoDocumento,
+            Documento = documento,
+            Nombres = nombres,
+            Apellidos = apellidos,
+            Telefono = telefono,
+            Nacionalidad = "PERUANA"
+        };
+        _db.Clientes.Add(nuevo);
+        await _db.SaveChangesAsync();
+        return nuevo;
+    }
+
+    private async Task<Cliente> ObtenerClienteAnonimoAsync()
+    {
+        var anonimo = await _db.Clientes.FirstOrDefaultAsync(c => c.Documento == "00000000");
+        if (anonimo != null)
+            return anonimo;
+
+        anonimo = new Cliente
+        {
+            TipoDocumento = "0",
+            Documento = "00000000",
+            Nombres = "Anonimo",
+            Apellidos = "",
+            Nacionalidad = "PERUANA"
+        };
+        _db.Clientes.Add(anonimo);
+        await _db.SaveChangesAsync();
+        return anonimo;
     }
 
     internal static decimal CalcularMontoTotal(DateTime fechaSalida, decimal precioNoche, bool esPorHoras)

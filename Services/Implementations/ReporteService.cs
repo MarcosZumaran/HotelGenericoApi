@@ -48,7 +48,7 @@ public class ReporteService : IReporteService
 
         try
         {
-            return await _db.ItemsVenta
+            var ventasQuery = await _db.ItemsVenta
                 .Where(iv => iv.IdVentaNavigation.FechaVenta >= fechaLimite)
                 .GroupBy(iv => iv.IdProductoNavigation.Nombre)
                 .Select(g => new TopProductoDto
@@ -57,10 +57,32 @@ public class ReporteService : IReporteService
                     CantidadTotal = g.Sum(iv => iv.Cantidad),
                     IngresoTotal = g.Sum(iv => iv.Subtotal) ?? 0
                 })
-                .OrderByDescending(tp => tp.IngresoTotal)
-                .Take(10)
                 .AsNoTracking()
                 .ToListAsync();
+
+            var consumosQuery = await _db.ItemsEstancia
+                .Where(ie => ie.FechaRegistro >= fechaLimite)
+                .GroupBy(ie => ie.IdProductoNavigation.Nombre)
+                .Select(g => new TopProductoDto
+                {
+                    Nombre = g.Key,
+                    CantidadTotal = g.Sum(ie => ie.Cantidad),
+                    IngresoTotal = g.Sum(ie => ie.Subtotal) ?? 0
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return ventasQuery.Concat(consumosQuery)
+                .GroupBy(tp => tp.Nombre)
+                .Select(g => new TopProductoDto
+                {
+                    Nombre = g.Key,
+                    CantidadTotal = g.Sum(tp => tp.CantidadTotal),
+                    IngresoTotal = g.Sum(tp => tp.IngresoTotal)
+                })
+                .OrderByDescending(tp => tp.IngresoTotal)
+                .Take(10)
+                .ToList();
         }
         catch (Exception ex)
         {

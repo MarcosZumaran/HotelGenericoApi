@@ -9,4 +9,7 @@ public class StockHabitacionDto
     public string NombreProducto { get; set; } = string.Empty;
     public int CantidadActual { get; set; }
     public int? StockBase { get; set; }
+    public bool EsAmenidad { get; set; }
+    public decimal PrecioUnitario { get; set; }
+    public string? Categoria { get; set; }
 }
