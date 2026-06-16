@@ -14,5 +14,7 @@ public partial class Pago
 
     public DateTime FechaPago { get; set; }
 
+    public string? Concepto { get; set; }
+
     public virtual Estancia IdEstanciaNavigation { get; set; } = null!;
 }

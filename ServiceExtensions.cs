@@ -62,6 +62,9 @@ public static class ServiceExtensions
 		services.AddScoped<IIncidenteService, IncidenteService>();
         services.AddScoped<IStockHabitacionService, StockHabitacionService>();
 
+        services.AddScoped<IParametroHotelService, ParametroHotelService>();
+        services.AddScoped<IFolioService, FolioService>();
+
 		// HttpClient tipificado para RENIEC
         services.AddHttpClient<IReniecService, ReniecService>();
 
@@ -78,6 +81,9 @@ public static class ServiceExtensions
 
         // Excel
         services.AddScoped<IExcelExportService, ExcelExportService>();
+
+        // Facturacion XML
+        services.AddScoped<IXmlComprobanteService, XmlComprobanteService>();
 
         // limpiado de backups
         services.AddHostedService<BackupCleanupService>();

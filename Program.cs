@@ -199,6 +199,117 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     {
         logger.LogWarning(ex, "No se pudieron crear los usuarios por defecto. Puede que ya existan.");
     }
+
+    // Asegurar que el tipo de movimiento REPOSICION exista
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<HotelGenericoApi.Data.HotelDbContext>();
+        if (!await db.TiposMovimientoStock.AnyAsync(t => t.Codigo == "REPOSICION"))
+        {
+            db.TiposMovimientoStock.Add(new HotelGenericoApi.Models.TipoMovimientoStock
+            {
+                Codigo = "REPOSICION",
+                Descripcion = "Reposicion de amenidad en habitacion",
+            });
+            await db.SaveChangesAsync();
+            logger.LogInformation("Tipo de movimiento REPOSICION creado exitosamente.");
+        }
+
+        var lateProduct = await db.Productos.FirstOrDefaultAsync(p => p.Nombre == "Late check-out");
+        if (lateProduct != null && (lateProduct.Stock != 0 || lateProduct.StockMinimo != 0 || lateProduct.EsVendibleEnTienda))
+        {
+            lateProduct.Stock = 0;
+            lateProduct.StockMinimo = 0;
+            lateProduct.EsVendibleEnTienda = false;
+            await db.SaveChangesAsync();
+            logger.LogInformation("Producto 'Late check-out' corregido: stock=0, stock_minimo=0, vendible=false.");
+        }
+
+        if (!await db.Productos.AnyAsync(p => p.Nombre == "Depósito de garantía"))
+        {
+            db.Productos.Add(new HotelGenericoApi.Models.Producto
+            {
+                Nombre = "Depósito de garantía",
+                Descripcion = "Depósito de garantía por estadía",
+                PrecioUnitario = 0,
+                IdAfectacionIgv = "10",
+                Stock = 0,
+                StockMinimo = 0,
+                UnidadMedida = "NIU",
+                EsAmenidad = false,
+                EsVendibleEnTienda = false,
+                CreatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            logger.LogInformation("Producto 'Depósito de garantía' creado.");
+        }
+
+        if (!await db.Productos.AnyAsync(p => p.Nombre == "Early check-in"))
+        {
+            db.Productos.Add(new HotelGenericoApi.Models.Producto
+            {
+                Nombre = "Early check-in",
+                Descripcion = "Cargo por entrada anticipada",
+                PrecioUnitario = 20,
+                IdAfectacionIgv = "10",
+                Stock = 0,
+                StockMinimo = 0,
+                UnidadMedida = "NIU",
+                EsAmenidad = false,
+                EsVendibleEnTienda = false,
+                CreatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            logger.LogInformation("Producto 'Early check-in' creado.");
+        }
+
+        var depKeys = new[] { "deposito_garantia_habilitado", "deposito_garantia_monto", "deposito_garantia_porcentaje",
+            "early_checkin_hora_limite", "early_checkin_cargo" };
+        foreach (var dk in depKeys)
+        {
+            if (!await db.ParametrosHotel.AnyAsync(p => p.Clave == dk))
+            {
+                var defVal = dk switch
+                {
+                    "deposito_garantia_habilitado" => "false",
+                    "deposito_garantia_monto" => "50",
+                    "deposito_garantia_porcentaje" => "30",
+                    "early_checkin_hora_limite" => "10:00",
+                    "early_checkin_cargo" => "20.00",
+                    _ => ""
+                };
+                db.ParametrosHotel.Add(new HotelGenericoApi.Models.ParametroHotel
+                {
+                    Clave = dk,
+                    Valor = defVal,
+                    Descripcion = dk.Contains("deposito") ? "Parámetro de depósito de garantía" : "Parámetro de early check-in",
+                    FechaActualizacion = DateTime.UtcNow,
+                });
+            }
+        }
+        await db.SaveChangesAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "No se pudo asegurar los productos/parámetros de depósito y early check-in.");
+    }
+}
+
+// Asegurar columna Pago.Concepto (compatibilidad con BD existente)
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    try
+    {
+        using var scope2 = app.Services.CreateScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<HotelGenericoApi.Data.HotelDbContext>();
+        await db2.Database.ExecuteSqlRawAsync(@"
+            IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Pago') AND name = 'Concepto')
+                ALTER TABLE Pago ADD Concepto nvarchar(200) NULL
+        ");
+    }
+    catch
+    {
+    }
 }
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))

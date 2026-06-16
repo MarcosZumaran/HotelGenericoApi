@@ -1208,5 +1208,123 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT 1 FROM estado_reserva WHERE codigo = 'Vencida')
+BEGIN
+    INSERT INTO estado_reserva (codigo, descripcion, es_final)
+    VALUES ('Vencida', 'Reserva vencida - no se realizó check-in', 1);
+    PRINT 'Estado "Vencida" insertado correctamente.';
+END
+ELSE
+BEGIN
+    PRINT 'El estado "Vencida" ya existe. No se realizaron cambios.';
+END
+GO
+
+-- ============================================================
+-- Script: add_configuracion_emisor.sql
+-- Descripcion: Agrega campos de datos del emisor (hotel) a la
+--              tabla configuracion para facturacion electronica SUNAT.
+-- Idempotente: solo agrega columnas que no existan.
+-- ============================================================
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'nombre_comercial')
+    ALTER TABLE configuracion ADD nombre_comercial NVARCHAR(200) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'codigo_establecimiento')
+    ALTER TABLE configuracion ADD codigo_establecimiento NVARCHAR(4) NULL DEFAULT '0000';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'punto_emision_boleta')
+    ALTER TABLE configuracion ADD punto_emision_boleta NVARCHAR(3) NULL DEFAULT '001';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'punto_emision_factura')
+    ALTER TABLE configuracion ADD punto_emision_factura NVARCHAR(3) NULL DEFAULT '001';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'logo_url')
+    ALTER TABLE configuracion ADD logo_url NVARCHAR(500) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'ubigeo')
+    ALTER TABLE configuracion ADD ubigeo NVARCHAR(6) NULL DEFAULT '';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'departamento')
+    ALTER TABLE configuracion ADD departamento NVARCHAR(100) NULL DEFAULT '';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'provincia')
+    ALTER TABLE configuracion ADD provincia NVARCHAR(100) NULL DEFAULT '';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'distrito')
+    ALTER TABLE configuracion ADD distrito NVARCHAR(100) NULL DEFAULT '';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'urbanizacion')
+    ALTER TABLE configuracion ADD urbanizacion NVARCHAR(100) NULL DEFAULT '';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'aplica_exoneracion_amazonia')
+    ALTER TABLE configuracion ADD aplica_exoneracion_amazonia BIT NULL DEFAULT 0;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('configuracion') AND name = 'leyenda_amazonia')
+    ALTER TABLE configuracion ADD leyenda_amazonia NVARCHAR(200) NULL DEFAULT 'SERVICIOS PRESTADOS EN LA AMAZONIA REGION SELVA PARA SER CONSUMIDOS EN LA MISMA';
+GO
+
+PRINT 'Campos de emisor agregados a configuracion correctamente.';
+GO
+
+-- ============================================================
+-- 1. regimen_tributario en configuracion
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.configuracion')
+      AND name = N'regimen_tributario'
+)
+BEGIN
+    ALTER TABLE dbo.configuracion
+        ADD regimen_tributario VARCHAR(20) NULL;
+
+    PRINT 'Columna regimen_tributario agregada a configuracion.';
+END
+ELSE
+    PRINT 'regimen_tributario ya existe en configuracion.';
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.pago')
+      AND name = N'concepto'
+)
+BEGIN
+    ALTER TABLE dbo.pago
+        ADD concepto NVARCHAR(200) NULL;
+
+    PRINT 'Columna concepto agregada a pago.';
+END
+ELSE
+    PRINT 'concepto ya existe en pago.';
+GO
+
+-- ============================================================
+-- 3. Unificar tasas de IGV a 18.00
+-- ============================================================
+UPDATE dbo.configuracion
+SET tasa_igv_hotel = 18.00,
+    tasa_igv_productos = 18.00
+WHERE tasa_igv_hotel <> 18.00
+   OR tasa_igv_productos <> 18.00;
+
+PRINT 'Tasas de IGV unificadas a 18.00.';
+GO
+
+
 PRINT N'Base de datos HotelDB creada con éxito.';
 GO
