@@ -55,32 +55,71 @@ public class HabitacionService : IHabitacionService
             .FirstOrDefaultAsync(h => h.IdHabitacion == id);
     }
 
-    public async Task<Habitacion> CreateAsync(Habitacion habitacion)
+    public async Task<Habitacion> CreateAsync(HabitacionCreateDto dto)
     {
-        // Si la habitación viene con amenidades, se deben guardar después
+        var habitacion = new Habitacion
+        {
+            NumeroHabitacion = dto.NumeroHabitacion,
+            Piso = dto.Piso ?? 0,
+            Descripcion = dto.Descripcion,
+            IdTipo = dto.IdTipo,
+            PrecioNoche = dto.PrecioNoche,
+            IdEstado = dto.IdEstado ?? 1,
+            FechaUltimoCambio = DateTime.UtcNow,
+            Caracteristicas = dto.Caracteristicas != null
+                ? System.Text.Json.JsonSerializer.Serialize(dto.Caracteristicas)
+                : null
+        };
+
         _db.Habitaciones.Add(habitacion);
         await _db.SaveChangesAsync();
+
+        if (dto.Amenidades != null && dto.Amenidades.Count != 0)
+        {
+            var amenidades = dto.Amenidades.Select(a => new HabitacionAmenidad
+            {
+                IdHabitacion = habitacion.IdHabitacion,
+                IdProducto = a.IdProducto,
+                CantidadBase = a.CantidadBase
+            });
+            await _db.HabitacionAmenidades.AddRangeAsync(amenidades);
+            await _db.SaveChangesAsync();
+        }
+
         _logger.LogInformation("Habitación {Numero} creada", habitacion.NumeroHabitacion);
         return habitacion;
     }
 
-    public async Task<Habitacion?> UpdateAsync(int id, Habitacion habitacionActualizada)
+    public async Task<Habitacion?> UpdateAsync(int id, HabitacionUpdateDto dto)
     {
         var existente = await _db.Habitaciones
             .Include(h => h.HabitacionAmenidades)
             .FirstOrDefaultAsync(h => h.IdHabitacion == id);
         if (existente == null) return null;
 
-        // Actualizar propiedades básicas
-        existente.NumeroHabitacion = habitacionActualizada.NumeroHabitacion;
-        existente.Piso = habitacionActualizada.Piso;
-        existente.Descripcion = habitacionActualizada.Descripcion;
-        existente.IdTipo = habitacionActualizada.IdTipo;
-        existente.PrecioNoche = habitacionActualizada.PrecioNoche;
-        existente.IdEstado = habitacionActualizada.IdEstado;
-        existente.Caracteristicas = habitacionActualizada.Caracteristicas;
+        if (dto.NumeroHabitacion != null) existente.NumeroHabitacion = dto.NumeroHabitacion;
+        if (dto.Piso.HasValue) existente.Piso = dto.Piso.Value;
+        if (dto.Descripcion != null) existente.Descripcion = dto.Descripcion;
+        if (dto.IdTipo.HasValue) existente.IdTipo = dto.IdTipo.Value;
+        if (dto.PrecioNoche.HasValue) existente.PrecioNoche = dto.PrecioNoche.Value;
+        if (dto.Caracteristicas != null)
+            existente.Caracteristicas = System.Text.Json.JsonSerializer.Serialize(dto.Caracteristicas);
 
-        // Las amenidades se actualizan aparte con el método específico
+        if (dto.Amenidades != null)
+        {
+            var existentes = existente.HabitacionAmenidades?.ToList() ?? new List<HabitacionAmenidad>();
+            if (existentes.Count != 0)
+                _db.HabitacionAmenidades.RemoveRange(existentes);
+
+            var nuevas = dto.Amenidades.Select(a => new HabitacionAmenidad
+            {
+                IdHabitacion = id,
+                IdProducto = a.IdProducto,
+                CantidadBase = a.CantidadBase
+            });
+            await _db.HabitacionAmenidades.AddRangeAsync(nuevas);
+        }
+
         await _db.SaveChangesAsync();
         _logger.LogInformation("Habitación {Numero} actualizada", existente.NumeroHabitacion);
         return existente;
@@ -102,6 +141,7 @@ public class HabitacionService : IHabitacionService
     {
         var habitacion = await _db.Habitaciones
             .Include(h => h.IdEstadoNavigation)
+            .Include(h => h.IdTipoNavigation)
             .FirstOrDefaultAsync(h => h.IdHabitacion == idHabitacion);
 
         if (habitacion == null) return false;
@@ -115,9 +155,18 @@ public class HabitacionService : IHabitacionService
 
         if (!transicionValida)
         {
-            _logger.LogWarning("Transición de estado no permitida: {Anterior} -> {Nuevo} en habitación {Id}",
-                estadoAnterior, idNuevoEstado, idHabitacion);
-            throw new InvalidOperationException($"No se puede cambiar de estado '{estadoAnterior}' a '{idNuevoEstado}'.");
+            // Permitir Limpieza -> Disponible (limpieza completada por el panel de limpieza)
+            if (estadoAnterior == EstadoHabitacionCodigo.Limpieza && idNuevoEstado == EstadoHabitacionCodigo.Disponible)
+            {
+                _logger.LogInformation(
+                    "Transición Limpieza -> Disponible permitida (bypass) para habitación {Id}", idHabitacion);
+            }
+            else
+            {
+                _logger.LogWarning("Transición de estado no permitida: {Anterior} -> {Nuevo} en habitación {Id}",
+                    estadoAnterior, idNuevoEstado, idHabitacion);
+                throw new InvalidOperationException($"No se puede cambiar de estado '{estadoAnterior}' a '{idNuevoEstado}'.");
+            }
         }
 
         using var transaction = await _db.Database.BeginTransactionAsync();
@@ -144,13 +193,21 @@ public class HabitacionService : IHabitacionService
             _logger.LogInformation("Habitación {Id} cambió de estado {Anterior} a {Nuevo}", idHabitacion, estadoAnterior, idNuevoEstado);
 
             // 👇 REPOSICIÓN DE AMENIDADES SI LA HABITACIÓN PASA A DISPONIBLE
-            if (idNuevoEstado == 1) // 1 = Disponible (según tu semilla)
+            if (idNuevoEstado == 1) // 1 = Disponible
             {
-                await _amenidadService.ReponerStockHabitacionAsync(idHabitacion);
-                _logger.LogInformation("Amenidades repuestas para habitación {Id}", idHabitacion);
+                var repuestas = await _amenidadService.ReponerAmenidadesHabitacionAsync(idHabitacion, idUsuario);
+                _logger.LogInformation("Amenidades repuestas para habitación {Id}: {Count} productos", idHabitacion, repuestas);
+
+                // T1.1: Emitir evento específico HabitacionLista para notificar a recepción
+                await _hubContext.Clients.All.SendAsync("HabitacionLista", new
+                {
+                    idHabitacion,
+                    numeroHabitacion = habitacion.NumeroHabitacion,
+                    tipoHabitacion = habitacion.Tipo?.Nombre ?? ""
+                });
             }
 
-            // Enviar notificación en tiempo real
+            // Enviar notificación en tiempo real del cambio de estado genérico
             await _hubContext.Clients.All.SendAsync("EstadoHabitacionCambiado", new
             {
                 idHabitacion,
@@ -255,6 +312,138 @@ public class HabitacionService : IHabitacionService
             .ToListAsync();
 
         return todas.Where(h => !idsOcupadas.Contains(h.IdHabitacion)).ToList();
+    }
+
+    public async Task<HabitacionSugeridaDto?> SugerirDisponibleAsync(int? tipoHabitacion = null, int? piso = null, int? cercanaA = null)
+    {
+        _logger.LogInformation("Sugiriendo habitación disponible (tipo={Tipo}, piso={Piso}, cercanaA={Cercana})",
+            tipoHabitacion, piso, cercanaA);
+
+        var disponibles = _db.Habitaciones
+            .Include(h => h.IdTipoNavigation)
+            .Where(h => h.IdEstado == EstadoHabitacionCodigo.Disponible)
+            .AsNoTracking();
+
+        if (tipoHabitacion.HasValue)
+            disponibles = disponibles.Where(h => h.IdTipo == tipoHabitacion.Value);
+
+        IOrderedQueryable<Habitacion> ordenadas;
+        if (piso.HasValue)
+        {
+            ordenadas = disponibles.OrderBy(h => h.Piso == piso.Value ? 0 : 1)
+                                   .ThenBy(h => h.Piso)
+                                   .ThenBy(h => h.NumeroHabitacion);
+        }
+        else if (cercanaA.HasValue)
+        {
+            ordenadas = disponibles.OrderBy(h => Math.Abs((long)(h.IdHabitacion - cercanaA.Value)))
+                                   .ThenBy(h => h.Piso)
+                                   .ThenBy(h => h.NumeroHabitacion);
+        }
+        else
+        {
+            ordenadas = disponibles.OrderBy(h => h.Piso)
+                                   .ThenBy(h => h.NumeroHabitacion);
+        }
+
+        var sugerida = await ordenadas.FirstOrDefaultAsync();
+        if (sugerida == null) return null;
+
+        return new HabitacionSugeridaDto(
+            IdHabitacion: sugerida.IdHabitacion,
+            Numero: sugerida.NumeroHabitacion,
+            NombreTipo: sugerida.Tipo?.Nombre ?? "",
+            Piso: sugerida.Piso,
+            PrecioNoche: sugerida.PrecioNoche,
+            Capacidad: sugerida.Tipo?.Capacidad ?? 0
+        );
+    }
+
+    public async Task<List<HabitacionEstadoActualDetalladoDto>> GetEstadoActualDetalladoAsync()
+    {
+        var hoy = DateTime.UtcNow.Date;
+        _logger.LogInformation("GetEstadoActualDetalladoAsync — fecha={Hoy:yyyy-MM-dd}", hoy);
+
+        try
+        {
+            var habitaciones = await _db.Habitaciones
+                .Include(h => h.IdTipoNavigation)
+                .Include(h => h.IdEstadoNavigation)
+                .Include(h => h.Estancias.Where(e => e.FechaCheckoutReal == null))
+                    .ThenInclude(e => e.IdClienteTitularNavigation)
+                .Include(h => h.Reservas.Where(r =>
+                    (r.IdEstadoReservaNavigation.Codigo == EstadoReservaCodigo.Code.Confirmada ||
+                     r.IdEstadoReservaNavigation.Codigo == EstadoReservaCodigo.Code.Pendiente) &&
+                    r.FechaEntradaPrevista >= hoy &&
+                    r.FechaEntradaPrevista < hoy.AddDays(1)))
+                .AsNoTracking()
+                .ToListAsync();
+
+            _logger.LogInformation("GetEstadoActualDetalladoAsync — {Count} habitaciones cargadas", habitaciones.Count);
+
+            var transiciones = await _db.TransicionesEstado.ToListAsync();
+
+            var result = habitaciones.Select(h =>
+            {
+                var estanciaActiva = h.Estancias.FirstOrDefault(e => e.FechaCheckoutReal == null);
+                var reservaHoy = h.Reservas.FirstOrDefault();
+
+                var acciones = new List<string>();
+                foreach (var t in transiciones.Where(t => t.IdEstadoActual == h.IdEstado))
+                {
+                    if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Ocupada) acciones.Add("CheckIn");
+                    else if (t.IdEstadoActual == EstadoHabitacionCodigo.Ocupada && t.IdEstadoSiguiente == EstadoHabitacionCodigo.Limpieza) acciones.Add("CheckOut");
+                    else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Mantenimiento) acciones.Add("Mantenimiento");
+                    else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Disponible) acciones.Add("Habilitar");
+                    else if (t.IdEstadoSiguiente == EstadoHabitacionCodigo.Bloqueado) acciones.Add("Reservar");
+                }
+                if (reservaHoy != null) acciones.Add("CancelarReserva");
+
+                // Calcular minutos en limpieza
+                var minutosEnLimpieza = h.IdEstado == EstadoHabitacionCodigo.Limpieza && h.FechaUltimoCambio != default
+                    ? (int)Math.Floor((DateTime.UtcNow - h.FechaUltimoCambio).TotalMinutes)
+                    : 0;
+
+                // Calcular prioridad
+                string prioridad;
+                if (h.IdEstado == EstadoHabitacionCodigo.Limpieza && reservaHoy != null)
+                    prioridad = "salida";
+                else if (h.IdEstado == EstadoHabitacionCodigo.Limpieza)
+                    prioridad = "normal";
+                else
+                    prioridad = "normal";
+
+                return new HabitacionEstadoActualDetalladoDto(
+                    IdHabitacion: h.IdHabitacion,
+                    NumeroHabitacion: h.NumeroHabitacion,
+                    Piso: h.Piso,
+                    IdTipo: h.IdTipo,
+                    NombreTipo: h.Tipo?.Nombre ?? "",
+                    PrecioNoche: h.PrecioNoche,
+                    IdEstado: h.IdEstado,
+                    NombreEstado: h.Estado ?? "",
+                    Descripcion: h.Descripcion,
+                    IdEstanciaActiva: estanciaActiva?.IdEstancia,
+                    ClienteHuesped: estanciaActiva?.ClienteTitular != null
+                        ? $"{estanciaActiva.ClienteTitular.Nombres} {estanciaActiva.ClienteTitular.Apellidos}"
+                        : null,
+                    AccionesDisponibles: acciones,
+                    FechaCheckin: estanciaActiva?.FechaCheckin,
+                    FechaCheckoutPrevista: estanciaActiva?.FechaCheckoutPrevista,
+                    FechaReservaEntrada: reservaHoy?.FechaEntradaPrevista,
+                    MinutosEnLimpieza: minutosEnLimpieza,
+                    Prioridad: prioridad
+                );
+            }).ToList();
+
+            _logger.LogInformation("GetEstadoActualDetalladoAsync — {ResultCount} DTOs generados", result.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error en GetEstadoActualDetalladoAsync: {Mensaje}", ex.Message);
+            throw;
+        }
     }
 
     public async Task<List<HabitacionAmenidad>> GetAmenidadesPorHabitacionAsync(int idHabitacion)
