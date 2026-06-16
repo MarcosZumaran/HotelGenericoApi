@@ -9,4 +9,6 @@ public interface IExcelExportService
     byte[] GenerateOcupacionDiariaExcel(IEnumerable<VOcupacionDiaria> data, DateOnly fecha);
     byte[] GenerateProductosExcel(IEnumerable<ProductoResponseDto> data);
     byte[] GenerateEstanciasActivasExcel(IEnumerable<Estancia> data);
+    byte[] GenerateParStockExcel(IEnumerable<ParStockItemDto> data);
+    byte[] GenerateGastoAmenitiesExcel(GastoAmenitiesResponseDto resumen, List<GastoAmenitiesDiarioDto> diario);
 }

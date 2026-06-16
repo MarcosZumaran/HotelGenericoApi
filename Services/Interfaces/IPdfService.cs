@@ -7,4 +7,5 @@ public interface IPdfService
     Task<byte[]> GenerarPdfEstanciaAsync(int idEstancia);
     Task<byte[]> GenerarPdfCierreCajaAsync(DateOnly fecha);
     Task<byte[]> GenerarPdfEstanciasActivasAsync();
+    Task<byte[]> GenerarPdfParStockAsync();
 }

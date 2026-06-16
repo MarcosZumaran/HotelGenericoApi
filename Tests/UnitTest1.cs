@@ -27,7 +27,10 @@ public class EstanciaServiceTests
         hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
         var amenidadMock = new Mock<IAmenidadService>();
         var reservaCorpMock = new Mock<IReservaCorporativaService>();
-        return new CheckinService(db, CreateMockLogger<CheckinService>(), hubMock.Object, amenidadMock.Object, reservaCorpMock.Object);
+        var paramHotelMock = new Mock<IParametroHotelService>();
+        paramHotelMock.Setup(p => p.GetDepositoGarantiaParamsAsync()).ReturnsAsync(new DTOs.Response.DepositoGarantiaParamsDto());
+        paramHotelMock.Setup(p => p.GetEarlyCheckinParamsAsync()).ReturnsAsync(new DTOs.Response.EarlyCheckinParamsDto());
+        return new CheckinService(db, CreateMockLogger<CheckinService>(), hubMock.Object, amenidadMock.Object, reservaCorpMock.Object, paramHotelMock.Object);
     }
 
     private CheckoutService CreateCheckoutService(HotelDbContext db)
@@ -38,7 +41,9 @@ public class EstanciaServiceTests
         var hubMock = new Mock<IHubContext<HotelGenericoApi.Hubs.HabitacionHub>>();
         hubMock.Setup(h => h.Clients).Returns(clientsMock.Object);
         var configCacheMock = new Mock<IConfiguracionCacheService>();
-        return new CheckoutService(db, CreateMockLogger<CheckoutService>(), hubMock.Object, configCacheMock.Object);
+        var paramHotelMock = new Mock<IParametroHotelService>();
+        paramHotelMock.Setup(p => p.GetCheckoutParamsAsync()).ReturnsAsync(new DTOs.Response.CheckoutParamsDto());
+        return new CheckoutService(db, CreateMockLogger<CheckoutService>(), hubMock.Object, configCacheMock.Object, paramHotelMock.Object);
     }
 
     private ConsumoEstanciaService CreateConsumoService(HotelDbContext db)

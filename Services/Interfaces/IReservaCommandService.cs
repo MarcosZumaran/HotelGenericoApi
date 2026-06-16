@@ -1,10 +1,10 @@
 using HotelGenericoApi.DTOs.Request;
-using HotelGenericoApi.Models;
+using HotelGenericoApi.DTOs.Response;
 
 namespace HotelGenericoApi.Services.Interfaces;
 
 public interface IReservaCommandService
 {
-    Task<Reserva> CreateReservaAsync(ReservaCreateDto dto, int idUsuario);
+    Task<ReservaResponseDto> CreateReservaAsync(ReservaCreateDto dto, int idUsuario);
     Task<bool> CancelarReservaAsync(int idReserva);
 }

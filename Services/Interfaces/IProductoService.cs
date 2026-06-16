@@ -5,8 +5,8 @@ namespace HotelGenericoApi.Services.Interfaces;
 
 public interface IProductoService
 {
-    Task<IEnumerable<ProductoResponseDto>> GetAllAsync();
-    Task<PagedResult<ProductoResponseDto>> GetPagedAsync(int page, int pageSize);
+    Task<IEnumerable<ProductoResponseDto>> GetAllAsync(bool soloVendibles = true);
+    Task<PagedResult<ProductoResponseDto>> GetPagedAsync(int page, int pageSize, bool soloVendibles = true);
     Task<ProductoResponseDto?> GetByIdAsync(int id);
     Task<ProductoResponseDto> CreateAsync(ProductoCreateDto dto, IFormFile? file);
     Task<bool> UpdateAsync(int id, ProductoUpdateDto dto, IFormFile? file);
