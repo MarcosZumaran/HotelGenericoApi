@@ -14,5 +14,6 @@ public sealed record ReservaCreateDto
     public bool UsarClienteAnonimo { get; init; } = false;
     public bool GuardarCliente { get; set; } = true;
     public int? IdClienteExistente { get; set; }
+    public int? IdCliente { get; set; }
     public bool EsPorHoras { get; init; } = false;
 }

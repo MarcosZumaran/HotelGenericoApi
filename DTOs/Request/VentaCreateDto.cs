@@ -10,6 +10,8 @@ public sealed record VentaCreateDto
     [StringLength(3, MinimumLength = 3)]
     public string MetodoPago { get; init; } = Constants.MetodoPagoCodigo.Efectivo;
 
+    public string? TipoComprobante { get; init; }
+
     [MinLength(1, ErrorMessage = "Debe incluir al menos un producto.")]
     public List<ItemVentaCreateDto> Items { get; init; } = new();
 }
