@@ -67,4 +67,18 @@ public class PdfController : ControllerBase
             return BadRequest(new { mensaje = ex.Message });
         }
     }
+
+    [HttpGet("EstanciasActivas")]
+    public async Task<IActionResult> GetEstanciasActivasPdf()
+    {
+        try
+        {
+            var bytes = await _pdfService.GenerarPdfEstanciasActivasAsync();
+            return File(bytes, "application/pdf", $"estancias_activas_{DateTime.Now:yyyyMMdd}.pdf");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+    }
 }

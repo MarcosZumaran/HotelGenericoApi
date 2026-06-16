@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -14,10 +15,12 @@ namespace HotelGenericoApi.Controllers;
 public class ReservaController : ControllerBase
 {
     private readonly IReservaQueryService _reservaQueryService;
+    private readonly IReservaCommandService _reservaCommandService;
 
-    public ReservaController(IReservaQueryService reservaQueryService)
+    public ReservaController(IReservaQueryService reservaQueryService, IReservaCommandService reservaCommandService)
     {
         _reservaQueryService = reservaQueryService;
+        _reservaCommandService = reservaCommandService;
     }
 
     [HttpGet]
@@ -55,14 +58,43 @@ public class ReservaController : ControllerBase
         return Ok(reserva);
     }
 
+    [HttpGet("llegadas-hoy")]
+    [ProducesResponseType(typeof(List<LlegadaHoyDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<LlegadaHoyDto>>> GetLlegadasHoy(
+        [FromQuery] string? estado = "Pendiente,Confirmada")
+    {
+        var llegadas = await _reservaQueryService.GetLlegadasHoyAsync(estado);
+        return Ok(llegadas);
+    }
+
     [HttpGet("fechas-ocupadas")]
     [ProducesResponseType(typeof(List<FechaOcupadaDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<FechaOcupadaDto>>> GetFechasOcupadas(
-        [FromQuery] int? idHabitacion,
+        [FromQuery] string? idHabitacion,
         [FromQuery] DateTime? fechaDesde,
         [FromQuery] DateTime? fechaHasta)
     {
-        var fechas = await _reservaQueryService.GetFechasOcupadasAsync(idHabitacion, fechaDesde, fechaHasta);
+        List<int>? ids = null;
+        if (!string.IsNullOrWhiteSpace(idHabitacion))
+        {
+            ids = idHabitacion
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(int.Parse)
+                .ToList();
+        }
+
+        var fechas = await _reservaQueryService.GetFechasOcupadasAsync(ids, fechaDesde, fechaHasta);
         return Ok(fechas);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Administrador")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var deleted = await _reservaCommandService.CancelarReservaAsync(id);
+        if (!deleted) return NotFound();
+        return NoContent();
     }
 }

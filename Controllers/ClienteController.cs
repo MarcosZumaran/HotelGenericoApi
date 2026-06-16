@@ -115,6 +115,29 @@ public class ClienteController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Consulta los datos de un RUC en SUNAT (VerificaPE).</summary>
+    /// <param name="ruc">Número de RUC (11 dígitos).</param>
+    /// <response code="200">Datos encontrados correctamente.</response>
+    /// <response code="400">Formato de RUC inválido.</response>
+    /// <response code="404">RUC no encontrado en SUNAT.</response>
+    /// <response code="502">Error al contactar con el servicio SUNAT.</response>
+    [HttpGet("consultar-ruc")]
+    [EnableRateLimiting("reniec")]
+    [ProducesResponseType(typeof(ReniecRucResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<IActionResult> ConsultarRuc([FromQuery] string ruc)
+    {
+        if (string.IsNullOrWhiteSpace(ruc) || ruc.Length != 11 || !ruc.All(char.IsDigit))
+            return BadRequest(new { mensaje = "El RUC debe tener 11 dígitos numéricos." });
+
+        var result = await _reniecService.ConsultarRucAsync(ruc);
+        if (result is null)
+            return NotFound(new { mensaje = "RUC no encontrado en SUNAT." });
+        return Ok(result);
+    }
+
     /// <summary>Busca clientes por nombre, documento u otros criterios.</summary>
     /// <param name="termino">Término de búsqueda (mínimo 2 caracteres).</param>
     [HttpGet("buscar")]

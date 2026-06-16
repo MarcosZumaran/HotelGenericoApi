@@ -16,11 +16,15 @@ public class ReporteController : ControllerBase
 {
     private readonly IReporteService _reporteService;
     private readonly IExcelExportService _excelExportService;
+    private readonly IPdfService _pdfService;
+    private readonly ILogger<ReporteController> _logger;
 
-    public ReporteController(IReporteService reporteService, IExcelExportService excelExportService)
+    public ReporteController(IReporteService reporteService, IExcelExportService excelExportService, IPdfService pdfService, ILogger<ReporteController> logger)
     {
         _reporteService = reporteService;
         _excelExportService = excelExportService;
+        _pdfService = pdfService;
+        _logger = logger;
     }
 
     /// <summary>Obtiene el cierre de caja diario con detalle de ingresos y egresos.</summary>
@@ -62,6 +66,35 @@ public class ReporteController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Obtiene la previsión de ocupación para los próximos días.</summary>
+    /// <param name="dias">Cantidad de días a proyectar (default: 7).</param>
+    [HttpGet("prevision-ocupacion")]
+    [ProducesResponseType(typeof(List<PrevisionOcupacionDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<PrevisionOcupacionDto>>> GetPrevisionOcupacion([FromQuery] int dias = 7)
+    {
+        var result = await _reporteService.GetPrevisionOcupacionAsync(dias);
+        return Ok(result);
+    }
+
+    /// <summary>Obtiene el tiempo medio de limpieza.</summary>
+    [HttpGet("tiempo-medio-limpieza")]
+    [ProducesResponseType(typeof(TiempoMedioLimpiezaDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TiempoMedioLimpiezaDto>> GetTiempoMedioLimpieza()
+    {
+        var result = await _reporteService.GetTiempoMedioLimpiezaAsync();
+        return Ok(result);
+    }
+
+    /// <summary>Obtiene la tasa de cancelaciones en los últimos meses.</summary>
+    /// <param name="meses">Cantidad de meses hacia atrás (default: 3).</param>
+    [HttpGet("tasa-cancelaciones")]
+    [ProducesResponseType(typeof(TasaCancelacionDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TasaCancelacionDto>> GetTasaCancelaciones([FromQuery] int meses = 3)
+    {
+        var result = await _reporteService.GetTasaCancelacionesAsync(meses);
+        return Ok(result);
+    }
+
     /// <summary>Exporta el cierre de caja a Excel.</summary>
     [HttpGet("cierre-caja/excel")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
@@ -80,5 +113,86 @@ public class ReporteController : ControllerBase
         var data = await _reporteService.GetOcupacionDiariaAsync(fecha);
         var bytes = _excelExportService.GenerateOcupacionDiariaExcel(data, fecha);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"ocupacion_diaria_{fecha:yyyy-MM-dd}.xlsx");
+    }
+
+    /// <summary>Obtiene el estado de par stock de todos los productos.</summary>
+    [HttpGet("par-stock")]
+    [ProducesResponseType(typeof(List<ParStockItemDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<ParStockItemDto>>> GetParStock()
+    {
+        var result = await _reporteService.GetParStockAsync();
+        return Ok(result);
+    }
+
+    /// <summary>Obtiene productos con stock crítico (Stock ≤ Stock Mínimo).</summary>
+    [HttpGet("stock-critico")]
+    [ProducesResponseType(typeof(List<StockCriticoDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<StockCriticoDto>>> GetStockCritico()
+    {
+        var result = await _reporteService.GetStockCriticoAsync();
+        return Ok(result);
+    }
+
+    /// <summary>Exporta el par stock a PDF.</summary>
+    [HttpGet("par-stock/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportarParStockPdf()
+    {
+        var bytes = await _pdfService.GenerarPdfParStockAsync();
+        return File(bytes, "application/pdf", "par_stock.pdf");
+    }
+
+    /// <summary>Exporta el par stock a Excel.</summary>
+    [HttpGet("par-stock/excel")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportarParStockExcel()
+    {
+        var data = await _reporteService.GetParStockAsync();
+        var bytes = _excelExportService.GenerateParStockExcel(data);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "par_stock.xlsx");
+    }
+
+    /// <summary>Obtiene el gasto total en amenities (desglosado por producto).</summary>
+    /// <param name="dias">Cantidad de días hacia atrás (default: 30).</param>
+    [HttpGet("gasto-amenities")]
+    [ProducesResponseType(typeof(GastoAmenitiesResponseDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<GastoAmenitiesResponseDto>> GetGastoAmenities([FromQuery] int dias = 30)
+    {
+        var result = await _reporteService.GetGastoAmenitiesAsync(dias);
+        return Ok(result);
+    }
+
+    /// <summary>Obtiene la evolución diaria del gasto en amenities.</summary>
+    /// <param name="dias">Cantidad de días hacia atrás (default: 30).</param>
+    [HttpGet("gasto-amenities-diario")]
+    [ProducesResponseType(typeof(List<GastoAmenitiesDiarioDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GastoAmenitiesDiarioDto>>> GetGastoAmenitiesDiario([FromQuery] int dias = 30)
+    {
+        var result = await _reporteService.GetGastoAmenitiesDiarioAsync(dias);
+        return Ok(result);
+    }
+
+    /// <summary>Exporta el reporte de gasto en amenities a Excel (2 hojas).</summary>
+    /// <param name="dias">Cantidad de días hacia atrás (default: 30).</param>
+    [HttpGet("gasto-amenities/excel")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ExportarGastoAmenitiesExcel([FromQuery] int dias = 30)
+    {
+        if (dias <= 0 || dias > 365)
+            return BadRequest(new { mensaje = "El parámetro 'dias' debe estar entre 1 y 365." });
+
+        try
+        {
+            var resumen = await _reporteService.GetGastoAmenitiesAsync(dias);
+            var diario = await _reporteService.GetGastoAmenitiesDiarioAsync(dias);
+            var bytes = _excelExportService.GenerateGastoAmenitiesExcel(resumen, diario);
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"gasto_amenities_{dias}dias.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al exportar Excel de gasto en amenities");
+            return StatusCode(500, new { mensaje = "Error interno al generar el archivo Excel." });
+        }
     }
 }

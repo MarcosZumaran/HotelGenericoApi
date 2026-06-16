@@ -27,6 +27,7 @@ public class EstanciaController : ControllerBase
     private readonly IReservaCommandService _reservaCommandService;
     private readonly IExcelExportService _excelExportService;
     private readonly IPdfService _pdfService;
+    private readonly IFolioService _folioService;
 
     public EstanciaController(
         IEstanciaQueryService queryService,
@@ -38,7 +39,8 @@ public class EstanciaController : ControllerBase
         ITrasladoHabitacionService trasladoService,
         IReservaCommandService reservaCommandService,
         IExcelExportService excelExportService,
-        IPdfService pdfService)
+        IPdfService pdfService,
+        IFolioService folioService)
     {
         _queryService = queryService;
         _checkinService = checkinService;
@@ -50,6 +52,7 @@ public class EstanciaController : ControllerBase
         _reservaCommandService = reservaCommandService;
         _excelExportService = excelExportService;
         _pdfService = pdfService;
+        _folioService = folioService;
     }
 
     [HttpGet]
@@ -63,8 +66,8 @@ public class EstanciaController : ControllerBase
     }
 
     [HttpGet("activas")]
-    [ProducesResponseType(typeof(List<Estancia>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<Estancia>>> GetActivas()
+    [ProducesResponseType(typeof(List<EstanciaActivaDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<EstanciaActivaDto>>> GetActivas()
     {
         var activas = await _queryService.GetActivasAsync();
         return Ok(activas);
@@ -74,7 +77,7 @@ public class EstanciaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportActivasExcel()
     {
-        var activas = await _queryService.GetActivasAsync();
+        var activas = await _queryService.GetActivasRawAsync();
         var bytes = _excelExportService.GenerateEstanciasActivasExcel(activas);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "huespedes_activos.xlsx");
     }
@@ -96,6 +99,17 @@ public class EstanciaController : ControllerBase
         if (estancia == null)
             return NotFound();
         return Ok(estancia);
+    }
+
+    [HttpGet("{id}/folio")]
+    [ProducesResponseType(typeof(FolioEstanciaDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<FolioEstanciaDto>> GetFolio(int id)
+    {
+        var folio = await _folioService.GetFolioAsync(id);
+        if (folio is null)
+            return NotFound(new { mensaje = "Estancia no encontrada" });
+        return Ok(folio);
     }
 
     [HttpPost("checkin")]
@@ -294,9 +308,9 @@ public class EstanciaController : ControllerBase
     }
 
     [HttpPost("reserva")]
-    [ProducesResponseType(typeof(Reserva), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ReservaResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<Reserva>> CreateReserva([FromBody] ReservaCreateDto dto)
+    public async Task<ActionResult<ReservaResponseDto>> CreateReserva([FromBody] ReservaCreateDto dto)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))

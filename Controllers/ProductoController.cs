@@ -22,7 +22,8 @@ public class ProductoController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20) => Ok(await _service.GetPagedAsync(page, pageSize));
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool incluirInternos = false) => Ok(await _service.GetPagedAsync(page, pageSize, !incluirInternos));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
