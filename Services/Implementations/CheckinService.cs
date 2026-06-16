@@ -16,19 +16,22 @@ public class CheckinService : ICheckinService
     private readonly IHubContext<HabitacionHub> _hubContext;
     private readonly IAmenidadService _amenidadService;
     private readonly IReservaCorporativaService _reservaCorporativaService;
+    private readonly IParametroHotelService _parametroHotelService;
 
     public CheckinService(
         HotelDbContext db,
         ILogger<CheckinService> logger,
         IHubContext<HabitacionHub> hubContext,
         IAmenidadService amenidadService,
-        IReservaCorporativaService reservaCorporativaService)
+        IReservaCorporativaService reservaCorporativaService,
+        IParametroHotelService parametroHotelService)
     {
         _db = db;
         _logger = logger;
         _hubContext = hubContext;
         _amenidadService = amenidadService;
         _reservaCorporativaService = reservaCorporativaService;
+        _parametroHotelService = parametroHotelService;
     }
 
     public async Task<Estancia> CheckinAsync(CheckinCreateDto dto, int idUsuario)
@@ -79,9 +82,72 @@ public class CheckinService : ICheckinService
                 IdEstancia = estancia.IdEstancia,
                 Monto = estancia.MontoTotal,
                 MetodoPago = estancia.MetodoPago ?? MetodoPagoCodigo.Efectivo,
-                FechaPago = DateTime.UtcNow
+                FechaPago = DateTime.UtcNow,
+                Concepto = "Habitación"
             };
             _db.Pagos.Add(pago);
+
+            var depParams = await _parametroHotelService.GetDepositoGarantiaParamsAsync();
+            if (bool.TryParse(depParams.DepositoHabilitado, out var depHabilitado) && depHabilitado && dto.AplicarDepositoGarantia)
+            {
+                decimal.TryParse(depParams.DepositoMonto, out var depMonto);
+                decimal.TryParse(depParams.DepositoPorcentaje, out var depPorcentaje);
+
+                var depositoCalculado = Math.Max(depMonto, estancia.MontoTotal * depPorcentaje / 100m);
+                if (depositoCalculado > 0)
+                {
+                    var pagoDeposito = new Pago
+                    {
+                        IdEstancia = estancia.IdEstancia,
+                        Monto = depositoCalculado,
+                        MetodoPago = estancia.MetodoPago ?? MetodoPagoCodigo.Efectivo,
+                        FechaPago = DateTime.UtcNow,
+                        Concepto = "Depósito de garantía"
+                    };
+                    _db.Pagos.Add(pagoDeposito);
+                }
+            }
+
+            var earlyParams = await _parametroHotelService.GetEarlyCheckinParamsAsync();
+            if (TimeSpan.TryParse(earlyParams.EarlyCheckinHoraLimite, out var earlyHora)
+                && decimal.TryParse(earlyParams.EarlyCheckinCargo, out var earlyCargo)
+                && earlyCargo > 0)
+            {
+                var ahora = DateTime.UtcNow;
+                var horaEntradaNormal = ahora.Date.Add(earlyHora);
+                if (ahora < horaEntradaNormal)
+                {
+                    var earlyProduct = await _db.Productos.FirstOrDefaultAsync(p => p.Nombre == "Early check-in");
+                    if (earlyProduct == null)
+                    {
+                        earlyProduct = new Producto
+                        {
+                            Nombre = "Early check-in",
+                            Descripcion = "Cargo por entrada anticipada",
+                            PrecioUnitario = earlyCargo,
+                            IdAfectacionIgv = "10",
+                            Stock = 0,
+                            StockMinimo = 0,
+                            UnidadMedida = "NIU",
+                            EsAmenidad = false,
+                            EsVendibleEnTienda = false,
+                            CreatedAt = DateTime.UtcNow,
+                        };
+                        _db.Productos.Add(earlyProduct);
+                        await _db.SaveChangesAsync();
+                    }
+
+                    _db.ItemsEstancia.Add(new ItemEstancia
+                    {
+                        IdEstancia = estancia.IdEstancia,
+                        IdProducto = earlyProduct.IdProducto,
+                        Cantidad = 1,
+                        PrecioUnitario = earlyCargo,
+                        Subtotal = earlyCargo,
+                        FechaRegistro = DateTime.UtcNow,
+                    });
+                }
+            }
 
             habitacion.IdEstado = EstadoHabitacionCodigo.Ocupada;
             habitacion.FechaUltimoCambio = DateTime.UtcNow;

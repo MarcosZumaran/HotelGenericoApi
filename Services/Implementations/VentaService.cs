@@ -179,13 +179,35 @@ public class VentaService : IVentaService
             _db.Ventas.Add(venta);
             await _db.SaveChangesAsync();
 
-            // Generar comprobante automático (ahora con el cliente cargado)
+            // Determinar tipo de comprobante
+            string tipoComprobante = "03"; // Boleta por defecto
+            if (cliente?.TipoDocumento == "6" && !string.IsNullOrEmpty(cliente.Documento) && cliente.Documento.Trim().Length == 11)
+            {
+                if (dto.TipoComprobante == "01")
+                {
+                    var config = await _configCache.GetConfiguracionAsync();
+                    if (config?.RegimenTributario == "NRUS")
+                        throw new InvalidOperationException("El regimen NRUS no permite emitir facturas. Solo boletas de venta.");
+                    tipoComprobante = "01";
+                }
+            }
+            else if (dto.TipoComprobante == "01")
+            {
+                throw new InvalidOperationException("Para emitir una factura, el cliente debe tener un RUC valido. Si el cliente no tiene RUC, emita una boleta de venta.");
+            }
+
+            string serie = tipoComprobante == "01" ? "F001" : "B001";
+            int correlativo = tipoComprobante == "01"
+                ? await ObtenerSiguienteCorrelativoSerieAsync("F001")
+                : await ObtenerSiguienteCorrelativoSerieAsync("B001");
+
+            // Generar comprobante automatico
             var comprobante = new Comprobante
             {
                 IdVenta = venta.IdVenta,
-                TipoComprobante = "03",
-                Serie = "B001",
-                Correlativo = await ObtenerSiguienteCorrelativoAsync(),
+                TipoComprobante = tipoComprobante,
+                Serie = serie,
+                Correlativo = correlativo,
                 FechaEmision = DateTime.UtcNow,
                 MontoTotal = total,
                 IgvMonto = total * await ObtenerIgvProductoAsync(),
@@ -255,10 +277,10 @@ public class VentaService : IVentaService
         return config?.TasaIgvProductos > 0 ? config.TasaIgvProductos / 100m : 0.18m;
     }
 
-    private async Task<int> ObtenerSiguienteCorrelativoAsync()
+    private async Task<int> ObtenerSiguienteCorrelativoSerieAsync(string serie)
     {
         int ultimo = await _db.Comprobantes
-            .Where(c => c.Serie == "B001")
+            .Where(c => c.Serie == serie)
             .MaxAsync(c => (int?)c.Correlativo) ?? 0;
         return ultimo + 1;
     }

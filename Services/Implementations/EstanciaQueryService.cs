@@ -35,13 +35,50 @@ public class EstanciaQueryService : IEstanciaQueryService
         return await query.ToPagedResultAsync(page, pageSize);
     }
 
-    public async Task<List<Estancia>> GetActivasAsync()
+    public async Task<List<Estancia>> GetActivasRawAsync()
     {
         return await _db.Estancias
             .Include(e => e.IdHabitacionNavigation).ThenInclude(h => h.IdTipoNavigation)
             .Include(e => e.IdClienteTitularNavigation)
             .Where(e => e.IdEstadoEstancia == EstadoEstanciaCodigo.Activa)
             .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<List<EstanciaActivaDto>> GetActivasAsync()
+    {
+        return await _db.Estancias
+            .Include(e => e.IdHabitacionNavigation)
+            .Include(e => e.IdClienteTitularNavigation)
+            .Include(e => e.Huespedes!).ThenInclude(h => h.IdClienteNavigation)
+            .Where(e => e.IdEstadoEstancia == EstadoEstanciaCodigo.Activa)
+            .AsNoTracking()
+            .Select(e => new EstanciaActivaDto(
+                e.IdEstancia,
+                e.IdHabitacion,
+                e.IdHabitacionNavigation.NumeroHabitacion,
+                e.IdClienteTitular,
+                (e.IdClienteTitularNavigation.Nombres + " " + e.IdClienteTitularNavigation.Apellidos).Trim(),
+                e.IdClienteTitularNavigation.Documento,
+                e.FechaCheckin,
+                e.FechaCheckoutPrevista,
+                e.FechaCheckoutReal,
+                e.MontoTotal,
+                e.IdEstadoEstanciaNavigation.Codigo,
+                e.CreatedAt,
+                e.EstaFuera,
+                e.HoraSalidaTemporal,
+                e.HoraRegresoTemporal,
+                e.LlavesDejadas,
+                e.Huespedes!
+                    .Where(h => !h.EsTitular)
+                    .Select(h => new AcompananteDto(
+                        h.IdHuesped,
+                        h.IdCliente,
+                        (h.IdClienteNavigation.Nombres + " " + h.IdClienteNavigation.Apellidos).Trim(),
+                        h.IdClienteNavigation.Documento
+                    )).ToList()
+            ))
             .ToListAsync();
     }
 
@@ -52,6 +89,9 @@ public class EstanciaQueryService : IEstanciaQueryService
             .Include(e => e.IdClienteTitularNavigation)
             .Include(e => e.ItemsEstancia!).ThenInclude(i => i.IdProductoNavigation)
             .Include(e => e.Huespedes!).ThenInclude(h => h.IdClienteNavigation)
+            .Include(e => e.Pagos!)
+            .AsSplitQuery()
+            .AsNoTracking()
             .FirstOrDefaultAsync(e => e.IdEstancia == id);
     }
 

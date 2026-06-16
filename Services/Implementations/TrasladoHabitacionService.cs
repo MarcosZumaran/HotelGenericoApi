@@ -30,6 +30,7 @@ public class TrasladoHabitacionService : ITrasladoHabitacionService
     {
         var estancia = await _db.Estancias
             .Include(e => e.IdHabitacionNavigation)
+            .Include(e => e.IdEstadoEstanciaNavigation)
             .FirstOrDefaultAsync(e => e.IdEstancia == estanciaId);
 
         if (estancia == null)
@@ -60,15 +61,34 @@ public class TrasladoHabitacionService : ITrasladoHabitacionService
             throw new InvalidOperationException("La nueva habitación ya está ocupada en el período de la estancia.");
 
         decimal montoAnterior = estancia.MontoTotal;
-        decimal nuevoMonto = montoAnterior;
+        var nochesRestantes = Math.Max(1, (int)(estancia.FechaCheckoutPrevista.Date - DateTime.UtcNow.Date).TotalDays);
+        decimal diferencia = 0;
 
-        if (nuevaHabitacion.PrecioNoche != habitacionOrigen.PrecioNoche)
+        if (nuevaHabitacion.PrecioNoche > habitacionOrigen.PrecioNoche)
         {
-            var nochesRestantes = Math.Max(1, (int)(estancia.FechaCheckoutPrevista.Date - DateTime.UtcNow.Date).TotalDays);
-            nuevoMonto = nochesRestantes * nuevaHabitacion.PrecioNoche;
-            estancia.MontoTotal = nuevoMonto;
+            diferencia = (nuevaHabitacion.PrecioNoche - habitacionOrigen.PrecioNoche) * nochesRestantes;
+
+            if (dto.CobrarDiferencia)
+            {
+                var productoTraslado = await _db.Productos
+                    .FirstOrDefaultAsync(p => p.Nombre == "Diferencia por traslado")
+                    ?? await _db.Productos.FirstAsync();
+
+                _db.ItemsEstancia.Add(new ItemEstancia
+                {
+                    IdEstancia = estanciaId,
+                    IdProducto = productoTraslado.IdProducto,
+                    Cantidad = 1,
+                    PrecioUnitario = diferencia,
+                    Subtotal = diferencia,
+                    FechaRegistro = DateTime.UtcNow
+                });
+
+                estancia.MontoTotal = montoAnterior + diferencia;
+            }
         }
 
+        decimal nuevoMonto = estancia.MontoTotal;
         decimal ajuste = nuevoMonto - montoAnterior;
 
         using var transaction = await _db.Database.BeginTransactionAsync();
@@ -103,7 +123,6 @@ public class TrasladoHabitacionService : ITrasladoHabitacionService
             });
 
             estancia.IdHabitacion = nuevaHabitacion.IdHabitacion;
-            estancia.MontoTotal = nuevoMonto;
 
             var historial = new HistorialTraslado
             {
@@ -155,7 +174,9 @@ public class TrasladoHabitacionService : ITrasladoHabitacionService
                 MontoAnterior = montoAnterior,
                 MontoNuevo = nuevoMonto,
                 Ajuste = ajuste,
-                Motivo = dto.Motivo
+                Motivo = dto.Motivo,
+                DiferenciaCobrada = diferencia,
+                NochesRestantes = nochesRestantes
             };
         }
         catch (Exception ex)

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using HotelGenericoApi.Constants;
 using HotelGenericoApi.Data;
 using HotelGenericoApi.DTOs.Request;
+using HotelGenericoApi.DTOs.Response;
 using HotelGenericoApi.Models;
 using HotelGenericoApi.Services.Interfaces;
 
@@ -18,14 +19,14 @@ public class ReservaCommandService : IReservaCommandService
         _logger = logger;
     }
 
-    public async Task<Reserva> CreateReservaAsync(ReservaCreateDto dto, int idUsuario)
+    public async Task<ReservaResponseDto> CreateReservaAsync(ReservaCreateDto dto, int idUsuario)
     {
         var habitacion = await _db.Habitaciones.FindAsync(dto.IdHabitacion)
             ?? throw new ArgumentException("Habitación no encontrada.");
 
         var cliente = await ResolverClienteAsync(
             dto.TipoDocumento, dto.Documento, dto.Nombres, dto.Apellidos,
-            null, dto.IdClienteExistente, dto.GuardarCliente);
+            null, dto.IdClienteExistente ?? dto.IdCliente, dto.GuardarCliente);
 
         var total = dto.EsPorHoras
             ? CalcularMontoPorHoras(dto.FechaEntradaPrevista, dto.FechaSalidaPrevista, habitacion.PrecioNoche)
@@ -46,7 +47,29 @@ public class ReservaCommandService : IReservaCommandService
         _db.Reservas.Add(reserva);
         await _db.SaveChangesAsync();
         _logger.LogInformation("Reserva {Id} creada para habitación {Numero}", reserva.IdReserva, habitacion.NumeroHabitacion);
-        return reserva;
+
+        var saved = await _db.Reservas
+            .Include(r => r.IdHabitacionNavigation)
+            .Include(r => r.IdClienteNavigation)
+            .Include(r => r.IdEstadoReservaNavigation)
+            .FirstAsync(r => r.IdReserva == reserva.IdReserva);
+
+        return new ReservaResponseDto(
+            IdReserva: saved.IdReserva,
+            IdHabitacion: saved.IdHabitacion,
+            NumeroHabitacion: saved.IdHabitacionNavigation?.NumeroHabitacion,
+            ClienteNombre: saved.IdClienteNavigation != null
+                ? $"{saved.IdClienteNavigation.Nombres} {saved.IdClienteNavigation.Apellidos}"
+                : null,
+            FechaEntradaPrevista: saved.FechaEntradaPrevista,
+            FechaSalidaPrevista: saved.FechaSalidaPrevista,
+            MontoTotal: saved.MontoTotal,
+            Estado: saved.IdEstadoReservaNavigation?.Descripcion ?? "Confirmada",
+            DocumentoCliente: saved.IdClienteNavigation?.Documento,
+            Observaciones: saved.Observaciones,
+            EsNoShow: saved.EsNoShow,
+            IdReservaCorporativa: saved.IdReservaCorporativa
+        );
     }
 
     public async Task<bool> CancelarReservaAsync(int idReserva)

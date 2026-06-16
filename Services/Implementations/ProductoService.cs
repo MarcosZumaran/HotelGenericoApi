@@ -22,21 +22,30 @@ public class ProductoService : IProductoService
         _mapper = mapper;
     }
 
-    public async Task<IEnumerable<ProductoResponseDto>> GetAllAsync()
-    {
-        var entities = await _db.Productos
-            .Include(p => p.IdAfectacionIgvNavigation)
-            .AsNoTracking()
-            .ToListAsync();
-
-        return entities.Select(MapToResponse);
-    }
-
-    public async Task<PagedResult<ProductoResponseDto>> GetPagedAsync(int page, int pageSize)
+    public async Task<IEnumerable<ProductoResponseDto>> GetAllAsync(bool soloVendibles = true)
     {
         var query = _db.Productos
             .Include(p => p.IdAfectacionIgvNavigation)
+            .Include(p => p.IdCategoriaNavigation)
             .AsNoTracking();
+
+        if (soloVendibles)
+            query = query.Where(p => p.EsVendibleEnTienda);
+
+        var entities = await query.ToListAsync();
+        return entities.Select(MapToResponse);
+    }
+
+    public async Task<PagedResult<ProductoResponseDto>> GetPagedAsync(int page, int pageSize, bool soloVendibles = true)
+    {
+        var query = _db.Productos
+            .Include(p => p.IdAfectacionIgvNavigation)
+            .Include(p => p.IdCategoriaNavigation)
+            .AsNoTracking();
+
+        if (soloVendibles)
+            query = query.Where(p => p.EsVendibleEnTienda);
+
         var paged = await query.ToPagedResultAsync(page, pageSize);
         var dtos = paged.Items.Select(MapToResponse).ToList();
         return new PagedResult<ProductoResponseDto>
@@ -52,6 +61,7 @@ public class ProductoService : IProductoService
     {
         var entity = await _db.Productos
             .Include(p => p.IdAfectacionIgvNavigation)
+            .Include(p => p.IdCategoriaNavigation)
             .FirstOrDefaultAsync(p => p.IdProducto == id);
 
         return entity is not null ? MapToResponse(entity) : null;
@@ -116,7 +126,9 @@ public class ProductoService : IProductoService
             p.ImagenUrl,
             p.EsAmenidad,
             p.EsVendibleEnTienda,
-            p.StockPorHabitacion
+            p.StockPorHabitacion,
+            p.IdCategoria,
+            p.IdCategoriaNavigation?.Nombre
         );
     }
 

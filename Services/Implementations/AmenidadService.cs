@@ -11,10 +11,12 @@ namespace HotelGenericoApi.Services.Implementations;
 public class AmenidadService : IAmenidadService
 {
     private readonly HotelDbContext _db;
+    private readonly ILogger<AmenidadService> _logger;
 
-    public AmenidadService(HotelDbContext db)
+    public AmenidadService(HotelDbContext db, ILogger<AmenidadService> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     /// <summary>
@@ -70,6 +72,142 @@ public class AmenidadService : IAmenidadService
         }
 
         await _db.SaveChangesAsync();
+    }
+
+    public async Task<List<AmenidadEstadoDto>> GetAmenidadesEstadoAsync(int idHabitacion)
+    {
+        var amenidadesPersonalizadas = await _db.HabitacionAmenidades
+            .Include(ha => ha.IdProductoNavigation)
+            .Where(ha => ha.IdHabitacion == idHabitacion)
+            .ToListAsync();
+
+        List<(int IdProducto, string Nombre, int CantidadBase, bool EsAmenidad)> baseList;
+
+        if (amenidadesPersonalizadas.Any())
+        {
+            baseList = amenidadesPersonalizadas
+                .Select(ha => (ha.IdProducto, ha.Producto?.Nombre ?? "", ha.CantidadBase, true))
+                .ToList();
+        }
+        else
+        {
+            var productos = await _db.Productos
+                .Where(p => p.EsAmenidad && p.StockPorHabitacion.HasValue && p.StockPorHabitacion > 0)
+                .ToListAsync();
+            baseList = productos
+                .Select(p => (p.IdProducto, p.Nombre, p.StockPorHabitacion!.Value, true))
+                .ToList();
+        }
+
+        var stocks = await _db.StockHabitaciones
+            .Where(s => s.IdHabitacion == idHabitacion)
+            .ToListAsync();
+
+        var stockDict = stocks.ToDictionary(s => s.IdProducto, s => s.CantidadActual);
+
+        return baseList.Select(b => new AmenidadEstadoDto
+        {
+            IdProducto = b.IdProducto,
+            Nombre = b.Nombre,
+            CantidadBase = b.CantidadBase,
+            CantidadActual = stockDict.GetValueOrDefault(b.IdProducto, 0),
+            Diferencia = Math.Max(0, b.CantidadBase - stockDict.GetValueOrDefault(b.IdProducto, 0)),
+            EsAmenidad = b.EsAmenidad,
+        }).ToList();
+    }
+
+    public async Task<int> ReponerAmenidadesHabitacionAsync(int idHabitacion, int idUsuario)
+    {
+        var amenidades = await GetAmenidadesEstadoAsync(idHabitacion);
+        var pendientes = amenidades.Where(a => a.Diferencia > 0).ToList();
+        if (!pendientes.Any())
+        {
+            _logger.LogInformation("Reposicion amenidades Hab#{Hab}: sin pendientes", idHabitacion);
+            return 0;
+        }
+
+        _logger.LogInformation("Reposicion amenidades Hab#{Hab}: {Count} productos por reponer", idHabitacion, pendientes.Count);
+
+        var codigoRepo = await AsegurarTipoMovimientoReposicionAsync();
+
+        var productosDict = await _db.Productos
+            .Where(p => pendientes.Select(a => a.IdProducto).Contains(p.IdProducto))
+            .ToDictionaryAsync(p => p.IdProducto);
+
+        foreach (var am in pendientes)
+        {
+            var stockHab = await _db.StockHabitaciones
+                .FirstOrDefaultAsync(s => s.IdHabitacion == idHabitacion && s.IdProducto == am.IdProducto);
+
+            if (stockHab == null)
+            {
+                _db.StockHabitaciones.Add(new StockHabitacion
+                {
+                    IdHabitacion = idHabitacion,
+                    IdProducto = am.IdProducto,
+                    CantidadActual = am.Diferencia,
+                    FechaActualizacion = DateTime.UtcNow,
+                });
+            }
+            else
+            {
+                stockHab.CantidadActual += am.Diferencia;
+                stockHab.FechaActualizacion = DateTime.UtcNow;
+            }
+
+            if (productosDict.TryGetValue(am.IdProducto, out var producto))
+            {
+                var stockAnterior = producto.Stock;
+                var descuento = Math.Min(am.Diferencia, producto.Stock);
+                producto.Stock = Math.Max(0, producto.Stock - am.Diferencia);
+
+                _db.MovimientosStock.Add(new MovimientoStock
+                {
+                    IdProducto = am.IdProducto,
+                    IdHabitacion = idHabitacion,
+                    CodigoTipoMovimiento = "REPOSICION",
+                    IdUsuario = idUsuario,
+                    Cantidad = am.Diferencia,
+                    StockAnterior = stockAnterior,
+                    StockNuevo = producto.Stock,
+                    CostoUnitario = producto.PrecioUnitario,
+                    Motivo = $"Reposicion de amenidad en habitacion #{idHabitacion}",
+                    FechaMovimiento = DateTime.UtcNow,
+                });
+
+                if (descuento < am.Diferencia)
+                {
+                    _logger.LogWarning(
+                        "Stock insuficiente para {Producto} (id={Id}): necesario={Necesario}, disponible={Disponible}. Se descuentan {Descuento}.",
+                        producto.Nombre, producto.IdProducto, am.Diferencia, stockAnterior, descuento);
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "Amenidad {Producto} (id={Id}): -{Cantidad} del stock general (anterior={Anterior}, nuevo={Nuevo})",
+                        producto.Nombre, producto.IdProducto, am.Diferencia, stockAnterior, producto.Stock);
+                }
+            }
+        }
+
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Reposicion amenidades Hab#{Hab}: {Count} productos repuestos", idHabitacion, pendientes.Count);
+        return pendientes.Count;
+    }
+
+    private async Task<string> AsegurarTipoMovimientoReposicionAsync()
+    {
+        var existente = await _db.TiposMovimientoStock
+            .FirstOrDefaultAsync(t => t.Codigo == "REPOSICION");
+        if (existente != null) return "REPOSICION";
+
+        _db.TiposMovimientoStock.Add(new TipoMovimientoStock
+        {
+            Codigo = "REPOSICION",
+            Descripcion = "Reposicion de amenidad en habitacion",
+        });
+        await _db.SaveChangesAsync();
+        return "REPOSICION";
     }
 
     /// <summary>
