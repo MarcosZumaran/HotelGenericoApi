@@ -15,5 +15,7 @@ public sealed record ProductoResponseDto(
     string? ImagenUrl,
     bool EsAmenidad,    
     bool EsVendibleEnTienda,
-    int? StockPorHabitacion
+    int? StockPorHabitacion,
+    int? IdCategoria,
+    string? NombreCategoria
 );

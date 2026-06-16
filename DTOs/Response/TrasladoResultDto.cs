@@ -11,4 +11,6 @@ public class TrasladoResultDto
     public decimal MontoNuevo { get; set; }
     public decimal Ajuste { get; set; }
     public string? Motivo { get; set; }
+    public decimal DiferenciaCobrada { get; set; }
+    public int NochesRestantes { get; set; }
 }
